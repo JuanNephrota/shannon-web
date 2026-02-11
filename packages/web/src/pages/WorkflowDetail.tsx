@@ -2,7 +2,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useWorkflow, useDeliverables, useCancelWorkflow } from '../api/hooks';
 import StatusBadge from '../components/StatusBadge';
 import AgentProgress from '../components/AgentProgress';
-import { ArrowLeft, FileText, Download, XCircle, Clock, DollarSign, Cpu, Loader2 } from 'lucide-react';
+import { ArrowLeft, FileText, Download, XCircle, Clock, DollarSign, Cpu, Loader2, ExternalLink } from 'lucide-react';
 
 export default function WorkflowDetail() {
   const { workflowId } = useParams<{ workflowId: string }>();
@@ -87,6 +87,16 @@ export default function WorkflowDetail() {
         </div>
 
         <div className="flex items-center gap-3">
+          <a
+            href={`http://localhost:8233/namespaces/default/workflows/${workflowId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <ExternalLink size={18} />
+            Temporal UI
+          </a>
+
           {reports.length > 0 && (
             <Link
               to={`/workflows/${workflowId}/report`}

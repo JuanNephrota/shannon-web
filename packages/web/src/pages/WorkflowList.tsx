@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useWorkflows } from '../api/hooks';
 import StatusBadge from '../components/StatusBadge';
-import { ArrowRight, Search } from 'lucide-react';
+import { ArrowRight, Search, ExternalLink } from 'lucide-react';
 import { useState } from 'react';
 
 export default function WorkflowList() {
@@ -108,12 +108,23 @@ export default function WorkflowList() {
                     {formatDuration(workflow.startTime, workflow.endTime)}
                   </td>
                   <td className="px-4 py-3">
-                    <Link
-                      to={`/workflows/${workflow.workflowId}`}
-                      className="flex items-center gap-1 text-shannon-600 hover:text-shannon-700"
-                    >
-                      View <ArrowRight size={16} />
-                    </Link>
+                    <div className="flex items-center gap-3">
+                      <Link
+                        to={`/workflows/${workflow.workflowId}`}
+                        className="flex items-center gap-1 text-shannon-600 hover:text-shannon-700"
+                      >
+                        View <ArrowRight size={16} />
+                      </Link>
+                      <a
+                        href={`http://localhost:8233/namespaces/default/workflows/${workflow.workflowId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-gray-400 hover:text-gray-600"
+                        title="Open in Temporal UI"
+                      >
+                        <ExternalLink size={16} />
+                      </a>
+                    </div>
                   </td>
                 </tr>
               ))}
