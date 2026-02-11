@@ -1,6 +1,8 @@
 import { AGENT_ORDER, AGENT_PHASE_MAP, AGENTS } from '@shannon/shared';
-import type { AgentMetrics } from '../api/client';
+import type { AgentMetrics } from '@/api/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle, Circle, Loader2, XCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface AgentProgressProps {
   completedAgents: string[];
@@ -54,55 +56,61 @@ export default function AgentProgress({
   return (
     <div className="space-y-6">
       {agentsByPhase.map(({ phase, label, agents }) => (
-        <div key={phase} className="bg-white rounded-lg border p-4">
-          <h3 className="font-semibold text-gray-900 mb-3">{label}</h3>
+        <Card key={phase}>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">{label}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className={cn(
+              "grid gap-3",
+              phase === 'vulnerability-analysis' || phase === 'exploitation'
+                ? 'grid-cols-5'
+                : 'grid-cols-1'
+            )}>
+              {agents.map((agent) => {
+                const status = getAgentStatus(agent);
+                const metrics = agentMetrics[agent];
+                const definition = AGENTS[agent];
 
-          <div className={`grid gap-3 ${phase === 'vulnerability-analysis' || phase === 'exploitation' ? 'grid-cols-5' : 'grid-cols-1'}`}>
-            {agents.map((agent) => {
-              const status = getAgentStatus(agent);
-              const metrics = agentMetrics[agent];
-              const definition = AGENTS[agent];
-
-              return (
-                <div
-                  key={agent}
-                  className={`p-3 rounded-lg border ${
-                    status === 'running'
-                      ? 'border-blue-300 bg-blue-50'
-                      : status === 'completed'
-                      ? 'border-green-200 bg-green-50'
-                      : status === 'failed'
-                      ? 'border-red-200 bg-red-50'
-                      : 'border-gray-200 bg-gray-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    {status === 'completed' && <CheckCircle className="w-4 h-4 text-green-600" />}
-                    {status === 'running' && <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />}
-                    {status === 'failed' && <XCircle className="w-4 h-4 text-red-600" />}
-                    {status === 'pending' && <Circle className="w-4 h-4 text-gray-400" />}
-                    <span className="text-sm font-medium truncate" title={definition.displayName}>
-                      {agent.replace('-vuln', '').replace('-exploit', '').replace('pre-', 'Pre-')}
-                    </span>
-                  </div>
-
-                  {metrics && (
-                    <div className="text-xs text-gray-500 space-y-1">
-                      <div className="flex justify-between">
-                        <span>Duration:</span>
-                        <span>{formatDuration(metrics.durationMs)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Cost:</span>
-                        <span>{formatCost(metrics.costUsd)}</span>
-                      </div>
+                return (
+                  <div
+                    key={agent}
+                    className={cn(
+                      "p-3 rounded-lg border",
+                      status === 'running' && "border-blue-300 bg-blue-50 dark:bg-blue-950/50",
+                      status === 'completed' && "border-green-200 bg-green-50 dark:bg-green-950/50",
+                      status === 'failed' && "border-destructive/50 bg-destructive/10",
+                      status === 'pending' && "border-border bg-muted/50"
+                    )}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      {status === 'completed' && <CheckCircle className="h-4 w-4 text-green-600" />}
+                      {status === 'running' && <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />}
+                      {status === 'failed' && <XCircle className="h-4 w-4 text-destructive" />}
+                      {status === 'pending' && <Circle className="h-4 w-4 text-muted-foreground" />}
+                      <span className="text-sm font-medium truncate" title={definition.displayName}>
+                        {agent.replace('-vuln', '').replace('-exploit', '').replace('pre-', 'Pre-')}
+                      </span>
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+
+                    {metrics && (
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <div className="flex justify-between">
+                          <span>Duration:</span>
+                          <span>{formatDuration(metrics.durationMs)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Cost:</span>
+                          <span>{formatCost(metrics.costUsd)}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
       ))}
     </div>
   );

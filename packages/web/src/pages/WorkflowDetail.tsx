@@ -1,8 +1,12 @@
 import { useParams, Link } from 'react-router-dom';
-import { useWorkflow, useDeliverables, useCancelWorkflow } from '../api/hooks';
-import StatusBadge from '../components/StatusBadge';
-import AgentProgress from '../components/AgentProgress';
-import { ArrowLeft, FileText, Download, XCircle, Clock, DollarSign, Cpu, Loader2, ExternalLink } from 'lucide-react';
+import { useWorkflow, useDeliverables, useCancelWorkflow } from '@/api/hooks';
+import StatusBadge from '@/components/StatusBadge';
+import AgentProgress from '@/components/AgentProgress';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ArrowLeft, FileText, Download, XCircle, Clock, DollarSign, Cpu, ExternalLink, AlertCircle } from 'lucide-react';
 
 export default function WorkflowDetail() {
   const { workflowId } = useParams<{ workflowId: string }>();
@@ -40,8 +44,15 @@ export default function WorkflowDetail() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-shannon-600 animate-spin" />
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <div className="grid grid-cols-4 gap-4">
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+        </div>
+        <Skeleton className="h-64" />
       </div>
     );
   }
@@ -49,11 +60,11 @@ export default function WorkflowDetail() {
   if (error || !workflow) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">Workflow not found</h2>
-        <p className="text-gray-500 mb-4">The workflow may have been deleted or the ID is invalid.</p>
-        <Link to="/workflows" className="text-shannon-600 hover:underline">
-          Back to workflows
-        </Link>
+        <h2 className="text-xl font-semibold mb-2">Workflow not found</h2>
+        <p className="text-muted-foreground mb-4">The workflow may have been deleted or the ID is invalid.</p>
+        <Button variant="link" asChild>
+          <Link to="/workflows">Back to workflows</Link>
+        </Button>
       </div>
     );
   }
@@ -68,18 +79,17 @@ export default function WorkflowDetail() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <Link
-            to="/workflows"
-            className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-2"
-          >
-            <ArrowLeft size={16} />
-            Back to workflows
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900 font-mono">{workflow.workflowId}</h1>
+          <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
+            <Link to="/workflows">
+              <ArrowLeft className="h-4 w-4" />
+              Back to workflows
+            </Link>
+          </Button>
+          <h1 className="text-2xl font-bold font-mono">{workflow.workflowId}</h1>
           <div className="flex items-center gap-4 mt-2">
             <StatusBadge status={workflow.status} />
             {workflow.currentPhase && workflow.status === 'running' && (
-              <span className="text-sm text-gray-500">
+              <span className="text-sm text-muted-foreground">
                 Phase: <span className="font-medium">{workflow.currentPhase}</span>
               </span>
             )}
@@ -87,104 +97,116 @@ export default function WorkflowDetail() {
         </div>
 
         <div className="flex items-center gap-3">
-          <a
-            href={`http://localhost:8233/namespaces/default/workflows/${workflowId}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <ExternalLink size={18} />
-            Temporal UI
-          </a>
+          <Button variant="outline" asChild>
+            <a
+              href={`http://localhost:8233/namespaces/default/workflows/${workflowId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Temporal UI
+            </a>
+          </Button>
 
           {reports.length > 0 && (
-            <Link
-              to={`/workflows/${workflowId}/report`}
-              className="flex items-center gap-2 px-4 py-2 bg-shannon-600 text-white rounded-lg hover:bg-shannon-700 transition-colors"
-            >
-              <FileText size={20} />
-              View Report
-            </Link>
+            <Button asChild>
+              <Link to={`/workflows/${workflowId}/report`}>
+                <FileText className="h-4 w-4" />
+                View Report
+              </Link>
+            </Button>
           )}
 
           {workflow.status === 'running' && (
-            <button
+            <Button
+              variant="outline"
               onClick={handleCancel}
               disabled={cancelWorkflow.isPending}
-              className="flex items-center gap-2 px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+              className="text-destructive border-destructive/50 hover:bg-destructive/10"
             >
-              <XCircle size={20} />
+              <XCircle className="h-4 w-4" />
               Cancel
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
       {/* Error */}
       {workflow.error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <h3 className="font-semibold text-red-900 mb-1">Error</h3>
-          <p className="text-red-700">{workflow.error}</p>
-          {workflow.failedAgent && (
-            <p className="text-sm text-red-600 mt-2">Failed agent: {workflow.failedAgent}</p>
-          )}
-        </div>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>
+            {workflow.error}
+            {workflow.failedAgent && (
+              <span className="block mt-1 text-sm">Failed agent: {workflow.failedAgent}</span>
+            )}
+          </AlertDescription>
+        </Alert>
       )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg border p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Clock className="w-5 h-5 text-blue-600" />
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <Clock className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Elapsed Time</p>
+                <p className="text-lg font-semibold">{formatDuration(workflow.elapsedMs)}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-gray-500">Elapsed Time</p>
-              <p className="text-lg font-semibold">{formatDuration(workflow.elapsedMs)}</p>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        <div className="bg-white rounded-lg border p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <Cpu className="w-5 h-5 text-green-600" />
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-green-100 rounded-lg">
+                <Cpu className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Completed Agents</p>
+                <p className="text-lg font-semibold">{workflow.completedAgents.length} / 13</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-gray-500">Completed Agents</p>
-              <p className="text-lg font-semibold">{workflow.completedAgents.length} / 13</p>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        <div className="bg-white rounded-lg border p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <DollarSign className="w-5 h-5 text-purple-600" />
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-purple-100 rounded-lg">
+                <DollarSign className="h-5 w-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Cost</p>
+                <p className="text-lg font-semibold">{formatCost(totalCost)}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-gray-500">Total Cost</p>
-              <p className="text-lg font-semibold">{formatCost(totalCost)}</p>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        <div className="bg-white rounded-lg border p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <FileText className="w-5 h-5 text-orange-600" />
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-orange-100 rounded-lg">
+                <FileText className="h-5 w-5 text-orange-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Deliverables</p>
+                <p className="text-lg font-semibold">{deliverables.length}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-gray-500">Deliverables</p>
-              <p className="text-lg font-semibold">{deliverables.length}</p>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Agent Progress */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Agent Progress</h2>
+        <h2 className="text-lg font-semibold mb-4">Agent Progress</h2>
         <AgentProgress
           completedAgents={workflow.completedAgents}
           currentAgent={workflow.currentAgent}
@@ -195,33 +217,36 @@ export default function WorkflowDetail() {
 
       {/* Deliverables */}
       {deliverables.length > 0 && (
-        <div className="bg-white rounded-lg border">
-          <div className="p-4 border-b">
-            <h2 className="text-lg font-semibold">Deliverables</h2>
-          </div>
-          <div className="divide-y">
-            {deliverables.map((deliverable) => (
-              <div key={deliverable.path} className="flex items-center justify-between p-4">
-                <div className="flex items-center gap-3">
-                  <FileText className="w-5 h-5 text-gray-400" />
-                  <div>
-                    <p className="font-medium text-gray-900">{deliverable.name}</p>
-                    <p className="text-sm text-gray-500">{deliverable.type}</p>
+        <Card>
+          <CardHeader>
+            <CardTitle>Deliverables</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y">
+              {deliverables.map((deliverable) => (
+                <div key={deliverable.path} className="flex items-center justify-between p-4">
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">{deliverable.name}</p>
+                      <p className="text-sm text-muted-foreground">{deliverable.type}</p>
+                    </div>
                   </div>
+                  <Button variant="ghost" size="sm" asChild>
+                    <a
+                      href={`/api/workflows/${workflowId}/deliverables/${deliverable.path}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Download className="h-4 w-4" />
+                      Download
+                    </a>
+                  </Button>
                 </div>
-                <a
-                  href={`/api/workflows/${workflowId}/deliverables/${deliverable.path}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-shannon-600 hover:text-shannon-700"
-                >
-                  <Download size={16} />
-                  Download
-                </a>
-              </div>
-            ))}
-          </div>
-        </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

@@ -1,7 +1,12 @@
 import { Link } from 'react-router-dom';
-import { useWorkflows } from '../api/hooks';
-import StatusBadge from '../components/StatusBadge';
-import { ArrowRight, Search, ExternalLink } from 'lucide-react';
+import { useWorkflows } from '@/api/hooks';
+import StatusBadge from '@/components/StatusBadge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ArrowRight, Search, ExternalLink, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 export default function WorkflowList() {
@@ -33,105 +38,111 @@ export default function WorkflowList() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Workflows</h1>
-          <p className="text-gray-500 mt-1">All penetration test workflows</p>
+          <h1 className="text-3xl font-bold tracking-tight">Workflows</h1>
+          <p className="text-muted-foreground mt-1">All penetration test workflows</p>
         </div>
-        <Link
-          to="/workflows/new"
-          className="px-4 py-2 bg-shannon-600 text-white rounded-lg hover:bg-shannon-700 transition-colors"
-        >
-          New Workflow
-        </Link>
+        <Button asChild>
+          <Link to="/workflows/new">
+            <Plus className="h-4 w-4" />
+            New Workflow
+          </Link>
+        </Button>
       </div>
 
       {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-        <input
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
           type="text"
           placeholder="Search workflows..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-shannon-500"
+          className="pl-9"
         />
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-lg border overflow-hidden">
-        {isLoading ? (
-          <div className="p-8 text-center text-gray-500">Loading...</div>
-        ) : error ? (
-          <div className="p-8 text-center text-red-500">Failed to load workflows</div>
-        ) : filteredWorkflows.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
-            {search ? 'No workflows match your search' : 'No workflows yet'}
-          </div>
-        ) : (
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Workflow ID</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Target</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Status</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Started</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Duration</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {filteredWorkflows.map((workflow) => (
-                <tr key={workflow.workflowId} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <span className="font-mono text-sm">{workflow.workflowId}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    {workflow.webUrl ? (
-                      <a
-                        href={workflow.webUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-shannon-600 hover:underline text-sm"
-                      >
-                        {workflow.webUrl}
-                      </a>
-                    ) : (
-                      <span className="text-gray-400 text-sm">-</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={workflow.status} size="sm" />
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {formatTime(workflow.startTime)}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {formatDuration(workflow.startTime, workflow.endTime)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <Link
-                        to={`/workflows/${workflow.workflowId}`}
-                        className="flex items-center gap-1 text-shannon-600 hover:text-shannon-700"
-                      >
-                        View <ArrowRight size={16} />
-                      </Link>
-                      <a
-                        href={`http://localhost:8233/namespaces/default/workflows/${workflow.workflowId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-gray-400 hover:text-gray-600"
-                        title="Open in Temporal UI"
-                      >
-                        <ExternalLink size={16} />
-                      </a>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <Card>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="p-4 space-y-3">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : error ? (
+            <div className="p-8 text-center text-destructive">Failed to load workflows</div>
+          ) : filteredWorkflows.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">
+              {search ? 'No workflows match your search' : 'No workflows yet'}
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Workflow ID</TableHead>
+                  <TableHead>Target</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Started</TableHead>
+                  <TableHead>Duration</TableHead>
+                  <TableHead className="w-[100px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredWorkflows.map((workflow) => (
+                  <TableRow key={workflow.workflowId}>
+                    <TableCell className="font-mono text-sm">
+                      {workflow.workflowId}
+                    </TableCell>
+                    <TableCell>
+                      {workflow.webUrl ? (
+                        <a
+                          href={workflow.webUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline text-sm"
+                        >
+                          {workflow.webUrl}
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={workflow.status} size="sm" />
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatTime(workflow.startTime)}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatDuration(workflow.startTime, workflow.endTime)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link to={`/workflows/${workflow.workflowId}`}>
+                            View
+                            <ArrowRight className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                        <a
+                          href={`http://localhost:8233/namespaces/default/workflows/${workflow.workflowId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-muted-foreground hover:text-foreground p-2"
+                          title="Open in Temporal UI"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

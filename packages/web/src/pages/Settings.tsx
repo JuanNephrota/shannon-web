@@ -1,5 +1,10 @@
 import { useState } from 'react';
-import { useSettings, useUpdateApiKeys, useTestApiKey } from '../api/hooks';
+import { useSettings, useUpdateApiKeys, useTestApiKey } from '@/api/hooks';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Key, CheckCircle, XCircle, Loader2, Eye, EyeOff, AlertCircle } from 'lucide-react';
 
 interface ApiKeyFieldProps {
@@ -36,125 +41,134 @@ function ApiKeyField({ label, provider, currentValue, onSave, isSaving }: ApiKey
   };
 
   return (
-    <div className="bg-white rounded-lg border p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <Key size={18} className="text-gray-400" />
-          <span className="font-medium text-gray-900">{label}</span>
-        </div>
-        {currentValue && !isEditing && (
-          <span className="flex items-center gap-1 text-sm text-green-600">
-            <CheckCircle size={14} />
-            Configured
-          </span>
-        )}
-      </div>
-
-      {isEditing ? (
-        <div className="space-y-3">
-          <div className="relative">
-            <input
-              type={showValue ? 'text' : 'password'}
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder="Enter API key..."
-              className="w-full px-3 py-2 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-shannon-500 font-mono text-sm"
-            />
-            <button
-              type="button"
-              onClick={() => setShowValue(!showValue)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              {showValue ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Key className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">{label}</span>
           </div>
+          {currentValue && !isEditing && (
+            <span className="flex items-center gap-1 text-sm text-green-600">
+              <CheckCircle className="h-4 w-4" />
+              Configured
+            </span>
+          )}
+        </div>
 
-          {testKey.data && (
-            <div
-              className={`flex items-center gap-2 text-sm ${
-                testKey.data.valid ? 'text-green-600' : 'text-red-600'
-              }`}
-            >
-              {testKey.data.valid ? (
-                <>
-                  <CheckCircle size={14} />
-                  API key is valid
-                </>
-              ) : (
-                <>
-                  <XCircle size={14} />
-                  {testKey.data.error || 'Invalid API key'}
-                </>
+        {isEditing ? (
+          <div className="space-y-3">
+            <div className="relative">
+              <Input
+                type={showValue ? 'text' : 'password'}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="Enter API key..."
+                className="pr-10 font-mono text-sm"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowValue(!showValue)}
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+              >
+                {showValue ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </Button>
+            </div>
+
+            {testKey.data && (
+              <div
+                className={`flex items-center gap-2 text-sm ${
+                  testKey.data.valid ? 'text-green-600' : 'text-destructive'
+                }`}
+              >
+                {testKey.data.valid ? (
+                  <>
+                    <CheckCircle className="h-4 w-4" />
+                    API key is valid
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-4 w-4" />
+                    {testKey.data.error || 'Invalid API key'}
+                  </>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleTest}
+                disabled={!value.trim() || testKey.isPending}
+              >
+                {testKey.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Testing...
+                  </>
+                ) : (
+                  'Test Key'
+                )}
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSave}
+                disabled={!value.trim() || isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save'
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setIsEditing(false);
+                  setValue('');
+                  testKey.reset();
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-sm text-muted-foreground">
+              {currentValue || 'Not configured'}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditing(true)}
+              >
+                {currentValue ? 'Change' : 'Add'}
+              </Button>
+              {currentValue && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClear}
+                  disabled={isSaving}
+                  className="text-destructive border-destructive/50 hover:bg-destructive/10"
+                >
+                  Remove
+                </Button>
               )}
             </div>
-          )}
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleTest}
-              disabled={!value.trim() || testKey.isPending}
-              className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-            >
-              {testKey.isPending ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  Testing...
-                </>
-              ) : (
-                'Test Key'
-              )}
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={!value.trim() || isSaving}
-              className="px-3 py-1.5 text-sm bg-shannon-600 text-white rounded-lg hover:bg-shannon-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                'Save'
-              )}
-            </button>
-            <button
-              onClick={() => {
-                setIsEditing(false);
-                setValue('');
-                testKey.reset();
-              }}
-              className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
-            >
-              Cancel
-            </button>
           </div>
-        </div>
-      ) : (
-        <div className="flex items-center justify-between">
-          <span className="font-mono text-sm text-gray-500">
-            {currentValue || 'Not configured'}
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsEditing(true)}
-              className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50"
-            >
-              {currentValue ? 'Change' : 'Add'}
-            </button>
-            {currentValue && (
-              <button
-                onClick={handleClear}
-                disabled={isSaving}
-                className="px-3 py-1.5 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50"
-              >
-                Remove
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -168,8 +182,11 @@ export default function Settings() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-shannon-600 animate-spin" />
+      <div className="max-w-2xl mx-auto space-y-6">
+        <Skeleton className="h-8 w-32" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
       </div>
     );
   }
@@ -177,9 +194,9 @@ export default function Settings() {
   if (error) {
     return (
       <div className="text-center py-12">
-        <AlertCircle className="w-12 h-12 mx-auto text-red-400 mb-4" />
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">Failed to load settings</h2>
-        <p className="text-gray-500">{(error as Error).message}</p>
+        <AlertCircle className="h-12 w-12 mx-auto text-destructive mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Failed to load settings</h2>
+        <p className="text-muted-foreground">{(error as Error).message}</p>
       </div>
     );
   }
@@ -187,26 +204,24 @@ export default function Settings() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-500 mt-1">Configure API keys and preferences</p>
+        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+        <p className="text-muted-foreground mt-1">Configure API keys and preferences</p>
       </div>
 
       {/* Warning if no Anthropic key */}
       {!settings?.hasAnthropicKey && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-medium text-amber-900">Anthropic API Key Required</h3>
-            <p className="text-sm text-amber-700 mt-1">
-              Shannon requires an Anthropic API key to run pentests. Add your key below to get started.
-            </p>
-          </div>
-        </div>
+        <Alert variant="warning">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Anthropic API Key Required</AlertTitle>
+          <AlertDescription>
+            Shannon requires an Anthropic API key to run pentests. Add your key below to get started.
+          </AlertDescription>
+        </Alert>
       )}
 
       {/* API Keys */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">API Keys</h2>
+        <h2 className="text-lg font-semibold mb-4">API Keys</h2>
         <div className="space-y-4">
           <ApiKeyField
             label="Anthropic API Key"
@@ -235,32 +250,36 @@ export default function Settings() {
       </div>
 
       {/* Info */}
-      <div className="bg-gray-50 rounded-lg p-4">
-        <h3 className="font-medium text-gray-900 mb-2">About API Keys</h3>
-        <ul className="text-sm text-gray-600 space-y-2">
-          <li>
-            <strong>Anthropic:</strong> Required for running pentests. Get a key at{' '}
-            <a
-              href="https://console.anthropic.com/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-shannon-600 hover:underline"
-            >
-              console.anthropic.com
-            </a>
-          </li>
-          <li>
-            <strong>OpenAI:</strong> Optional. Used with router mode for alternative models.
-          </li>
-          <li>
-            <strong>OpenRouter:</strong> Optional. Provides access to multiple LLM providers.
-          </li>
-        </ul>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">About API Keys</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="text-sm text-muted-foreground space-y-2">
+            <li>
+              <strong>Anthropic:</strong> Required for running pentests. Get a key at{' '}
+              <a
+                href="https://console.anthropic.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                console.anthropic.com
+              </a>
+            </li>
+            <li>
+              <strong>OpenAI:</strong> Optional. Used with router mode for alternative models.
+            </li>
+            <li>
+              <strong>OpenRouter:</strong> Optional. Provides access to multiple LLM providers.
+            </li>
+          </ul>
+        </CardContent>
+      </Card>
 
       {/* Storage notice */}
-      <p className="text-xs text-gray-400">
-        API keys are stored locally in <code className="bg-gray-100 px-1 rounded">.shannon-settings.json</code> and are not committed to git.
+      <p className="text-xs text-muted-foreground">
+        API keys are stored locally in <code className="bg-muted px-1 rounded">.shannon-settings.json</code> and are not committed to git.
       </p>
     </div>
   );
