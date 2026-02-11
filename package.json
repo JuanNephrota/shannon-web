@@ -1,0 +1,16 @@
+{
+  "name": "shannon-web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "concurrently \"pnpm --filter @shannon/api dev\" \"pnpm --filter @shannon/web dev\"",
+    "dev:api": "pnpm --filter @shannon/shared build && pnpm --filter @shannon/api dev",
+    "dev:web": "pnpm --filter @shannon/web dev",
+    "start": "pnpm --filter @shannon/api start"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  }
+}
