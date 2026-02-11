@@ -11,14 +11,75 @@ This is a standalone web application for managing Shannon pentest workflows. It 
 - **Configuration** - Manage pentest configuration files
 - **Settings** - Configure API keys for LLM providers
 
-## Prerequisites
+## Quick Start with Docker
+
+The easiest way to run Shannon Web is with Docker Compose:
+
+```bash
+# 1. Clone and configure
+git clone https://github.com/your-org/shannon-web.git
+cd shannon-web
+cp .env.example .env
+
+# 2. Edit .env to set SHANNON_ROOT (path to Shannon project)
+#    and ANTHROPIC_API_KEY
+
+# 3. Start the services
+docker compose up -d
+
+# 4. Open http://localhost:3001
+```
+
+### Docker Compose Profiles
+
+```bash
+# Start web frontend + Temporal (most common)
+docker compose up -d
+
+# Start complete stack including Shannon worker
+docker compose --profile worker up -d
+
+# View logs
+docker compose logs -f web
+
+# Stop all services
+docker compose down
+
+# Stop and remove all data (fresh start)
+docker compose down -v
+```
+
+### Services
+
+| Service | Port | Description |
+|---------|------|-------------|
+| `web` | 3001 | Shannon Web (API + frontend) |
+| `temporal` | 7233 | Temporal gRPC server |
+| `temporal` | 8233 | Temporal Web UI |
+| `worker` | - | Shannon worker (optional, requires `--profile worker`) |
+
+### Environment Variables for Docker
+
+```bash
+# Required
+SHANNON_ROOT=/path/to/shannon          # Path to Shannon project
+ANTHROPIC_API_KEY=sk-ant-...           # Anthropic API key
+
+# Optional
+TARGET_REPO=/path/to/target            # Target repo (when using worker profile)
+CLAUDE_CODE_MAX_OUTPUT_TOKENS=64000    # Increase for long reports
+```
+
+## Local Development
+
+### Prerequisites
 
 - Node.js 22+
 - pnpm
 - Running [Temporal](https://temporal.io/) server (default: `localhost:7233`)
 - Shannon project built (`npm run build` in Shannon directory)
 
-## Setup
+### Setup
 
 1. **Install dependencies:**
    ```bash
@@ -36,9 +97,9 @@ This is a standalone web application for managing Shannon pentest workflows. It 
    pnpm build
    ```
 
-## Running
+### Running
 
-### Development
+#### Development
 
 ```bash
 # Run API and web frontend concurrently
@@ -49,7 +110,7 @@ pnpm dev:api   # API server on http://localhost:3001
 pnpm dev:web   # Web frontend on http://localhost:5173
 ```
 
-### Production
+#### Production
 
 ```bash
 pnpm build
@@ -83,6 +144,8 @@ shannon-web/
 │   ├── shared/    # Shared TypeScript types
 │   ├── api/       # Express API server
 │   └── web/       # React + Vite frontend
+├── Dockerfile     # Multi-stage Docker build
+├── docker-compose.yml
 └── package.json   # Workspace root
 ```
 
@@ -90,6 +153,21 @@ The API server connects to:
 - **Temporal** - For workflow orchestration
 - **Shannon audit-logs/** - For session data and deliverables
 - **Shannon configs/** - For pentest configuration files
+
+## Building Docker Image Manually
+
+```bash
+# Build the image
+docker build -t shannon-web .
+
+# Run with external Temporal
+docker run -d \
+  -p 3001:3001 \
+  -e TEMPORAL_ADDRESS=host.docker.internal:7233 \
+  -e SHANNON_ROOT=/shannon \
+  -v /path/to/shannon:/shannon:ro \
+  shannon-web
+```
 
 ## License
 

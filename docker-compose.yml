@@ -1,0 +1,92 @@
+#
+# Docker Compose for Shannon Web Frontend
+#
+# Usage:
+#   Start web frontend only (connects to external Temporal):
+#     docker compose up -d web
+#
+#   Start with built-in Temporal server:
+#     docker compose up -d
+#
+#   Start complete stack with Shannon worker:
+#     docker compose --profile worker up -d
+#
+
+services:
+  # Temporal server for workflow orchestration
+  temporal:
+    image: temporalio/temporal:latest
+    command: ["server", "start-dev", "--db-filename", "/home/temporal/temporal.db", "--ip", "0.0.0.0"]
+    ports:
+      - "7233:7233"   # gRPC
+      - "8233:8233"   # Web UI
+    volumes:
+      - temporal-data:/home/temporal
+    healthcheck:
+      test: ["CMD", "temporal", "operator", "cluster", "health", "--address", "localhost:7233"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - shannon-network
+
+  # Shannon Web Frontend (API + React UI)
+  web:
+    build: .
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - TEMPORAL_ADDRESS=temporal:7233
+      - SHANNON_ROOT=/shannon
+    depends_on:
+      temporal:
+        condition: service_healthy
+    volumes:
+      # Mount Shannon directory for audit-logs and configs access
+      - ${SHANNON_ROOT:-../shannon}:/shannon:ro
+      # Persist settings
+      - web-data:/app/data
+    networks:
+      - shannon-network
+
+  # Shannon Worker (optional - use profile 'worker' to enable)
+  # Requires SHANNON_ROOT to point to the Shannon repository
+  worker:
+    profiles: ["worker"]
+    build:
+      context: ${SHANNON_ROOT:-../shannon}
+      dockerfile: Dockerfile
+    entrypoint: ["node", "dist/temporal/worker.js"]
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL:-}
+      - ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN:-}
+      - ROUTER_DEFAULT=${ROUTER_DEFAULT:-}
+      - CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-}
+      - CLAUDE_CODE_MAX_OUTPUT_TOKENS=${CLAUDE_CODE_MAX_OUTPUT_TOKENS:-64000}
+    depends_on:
+      temporal:
+        condition: service_healthy
+    volumes:
+      - ${SHANNON_ROOT:-../shannon}/prompts:/app/prompts
+      - ${SHANNON_ROOT:-../shannon}/audit-logs:/app/audit-logs
+      - ${SHANNON_ROOT:-../shannon}/configs:/app/configs
+      - ${TARGET_REPO:-.}:/target-repo
+    shm_size: 2gb
+    ipc: host
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      - shannon-network
+
+volumes:
+  temporal-data:
+  web-data:
+
+networks:
+  shannon-network:
+    driver: bridge
