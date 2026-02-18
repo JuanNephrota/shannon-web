@@ -1,24 +1,17 @@
 import fs from 'fs/promises';
 import path from 'path';
 import type { Deliverable } from '@shannon/shared';
+import {
+  SessionMetricsSchema,
+  type SessionMetrics,
+  safeParseJson,
+} from '../schemas/index.js';
 
 // Shannon project root - must be configured via environment variable
 const SHANNON_ROOT = process.env.SHANNON_ROOT || path.resolve(process.cwd(), '..');
 
-export interface SessionMetrics {
-  session: {
-    id: string;
-    createdAt: string;
-    targetUrl: string;
-  };
-  metrics: {
-    total_duration_ms: number;
-    total_cost_usd: number;
-    total_input_tokens: number;
-    total_output_tokens: number;
-  };
-  agents: Record<string, unknown>;
-}
+// Re-export the type from schemas for backwards compatibility
+export type { SessionMetrics } from '../schemas/index.js';
 
 export class AuditService {
   private auditLogsDir: string;
@@ -48,16 +41,23 @@ export class AuditService {
           const sessionJsonPath = path.join(sessionPath, 'session.json');
 
           try {
-            const data = JSON.parse(await fs.readFile(sessionJsonPath, 'utf8')) as SessionMetrics;
-            sessions.push({
-              workflowId: entry.name,
-              targetUrl: data.session?.targetUrl,
-              createdAt: data.session?.createdAt,
-              metrics: {
-                totalDuration: data.metrics?.total_duration_ms || 0,
-                totalCost: data.metrics?.total_cost_usd || 0,
-              },
-            });
+            const rawData = await fs.readFile(sessionJsonPath, 'utf8');
+            // Validate session.json against schema before using
+            const data = safeParseJson(SessionMetricsSchema, rawData, `session.json for ${entry.name}`);
+            if (data) {
+              sessions.push({
+                workflowId: entry.name,
+                targetUrl: data.session?.targetUrl,
+                createdAt: data.session?.createdAt,
+                metrics: {
+                  totalDuration: data.metrics?.total_duration_ms || 0,
+                  totalCost: data.metrics?.total_cost_usd || 0,
+                },
+              });
+            } else {
+              // Invalid session.json, include workflow with minimal info
+              sessions.push({ workflowId: entry.name });
+            }
           } catch {
             // Session.json may not exist yet for running workflows
             sessions.push({ workflowId: entry.name });
@@ -79,8 +79,9 @@ export class AuditService {
     const sessionPath = path.join(this.auditLogsDir, workflowId, 'session.json');
 
     try {
-      const data = await fs.readFile(sessionPath, 'utf8');
-      return JSON.parse(data);
+      const rawData = await fs.readFile(sessionPath, 'utf8');
+      // Validate session.json against schema before returning
+      return safeParseJson(SessionMetricsSchema, rawData, `session.json for ${workflowId}`);
     } catch {
       return null;
     }

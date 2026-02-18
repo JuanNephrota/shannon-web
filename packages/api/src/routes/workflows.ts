@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { temporalService } from '../services/temporal.js';
 import { auditService } from '../services/audit.js';
 import { configService } from '../services/config.js';
+import { StartWorkflowSchema } from '../schemas/index.js';
 import type { PipelineInput } from '@shannon/shared';
 
 const router: Router = Router();
@@ -9,12 +10,17 @@ const router: Router = Router();
 // Start a new workflow
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { webUrl, repoPath, configName, outputPath, pipelineTestingMode } = req.body;
-
-    if (!webUrl || !repoPath) {
-      res.status(400).json({ error: 'webUrl and repoPath are required' });
+    // Validate request body against schema
+    const parseResult = StartWorkflowSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      res.status(400).json({
+        error: 'Invalid request body',
+        details: parseResult.error.issues.map(i => `${i.path.join('.')}: ${i.message}`),
+      });
       return;
     }
+
+    const { webUrl, repoPath, configName, outputPath, pipelineTestingMode } = parseResult.data;
 
     const input: PipelineInput = {
       webUrl,

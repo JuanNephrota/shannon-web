@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { configService } from '../services/config.js';
+import { SaveConfigSchema } from '../schemas/index.js';
 
 const router: Router = Router();
 
@@ -40,13 +41,18 @@ router.get('/:name', async (req: Request, res: Response) => {
 router.put('/:name', async (req: Request, res: Response) => {
   try {
     const { name } = req.params;
-    const { content } = req.body;
 
-    if (!content) {
-      res.status(400).json({ error: 'Content is required' });
+    // Validate request body against schema
+    const parseResult = SaveConfigSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      res.status(400).json({
+        error: 'Invalid request body',
+        details: parseResult.error.issues.map(i => `${i.path.join('.')}: ${i.message}`),
+      });
       return;
     }
 
+    const { content } = parseResult.data;
     const result = await configService.saveConfig(name, content);
 
     if (!result.success) {

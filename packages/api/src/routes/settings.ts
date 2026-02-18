@@ -1,5 +1,14 @@
 import { Router, Request, Response } from 'express';
 import { settingsService } from '../services/settings.js';
+import {
+  UpdateApiKeysSchema,
+  UpdateRouterSchema,
+  TestApiKeySchema,
+  AnthropicErrorSchema,
+  OpenAIErrorSchema,
+  OpenRouterErrorSchema,
+  safeValidate,
+} from '../schemas/index.js';
 
 const router: Router = Router();
 
@@ -45,7 +54,17 @@ router.get('/', async (_req: Request, res: Response) => {
 // Update API keys
 router.put('/api-keys', async (req: Request, res: Response) => {
   try {
-    const { anthropicApiKey, openaiApiKey, openrouterApiKey } = req.body;
+    // Validate request body against schema
+    const parseResult = UpdateApiKeysSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      res.status(400).json({
+        error: 'Invalid request body',
+        details: parseResult.error.issues.map(i => `${i.path.join('.')}: ${i.message}`),
+      });
+      return;
+    }
+
+    const { anthropicApiKey, openaiApiKey, openrouterApiKey } = parseResult.data;
 
     // Only update keys that are explicitly provided in the request
     const updates: Record<string, string | undefined> = {};
@@ -75,9 +94,18 @@ router.put('/api-keys', async (req: Request, res: Response) => {
 // Update router default
 router.put('/router', async (req: Request, res: Response) => {
   try {
-    const { routerDefault } = req.body;
+    // Validate request body against schema
+    const parseResult = UpdateRouterSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      res.status(400).json({
+        error: 'Invalid request body',
+        details: parseResult.error.issues.map(i => `${i.path.join('.')}: ${i.message}`),
+      });
+      return;
+    }
 
-    await settingsService.setRouterDefault(routerDefault);
+    const { routerDefault } = parseResult.data;
+    await settingsService.setRouterDefault(routerDefault ?? undefined);
 
     res.json({ success: true });
   } catch (error) {
@@ -89,12 +117,17 @@ router.put('/router', async (req: Request, res: Response) => {
 // Test API key validity
 router.post('/test-key', async (req: Request, res: Response) => {
   try {
-    const { provider, apiKey } = req.body;
-
-    if (!provider || !apiKey) {
-      res.status(400).json({ error: 'Provider and apiKey are required' });
+    // Validate request body against schema
+    const parseResult = TestApiKeySchema.safeParse(req.body);
+    if (!parseResult.success) {
+      res.status(400).json({
+        error: 'Invalid request body',
+        details: parseResult.error.issues.map(i => `${i.path.join('.')}: ${i.message}`),
+      });
       return;
     }
+
+    const { provider, apiKey } = parseResult.data;
 
     let valid = false;
     let error: string | null = null;
@@ -122,8 +155,10 @@ router.post('/test-key', async (req: Request, res: Response) => {
         // 200 or 400 (bad request but authenticated) means key is valid
         valid = response.status === 200 || response.status === 400;
         if (!valid) {
-          const data = await response.json();
-          error = data.error?.message || `HTTP ${response.status}`;
+          const rawData = await response.json();
+          // Validate LLM API response against schema before using
+          const validatedError = safeValidate(AnthropicErrorSchema, rawData, 'Anthropic API response');
+          error = validatedError?.error?.message || `HTTP ${response.status}`;
         }
       } catch (e) {
         error = e instanceof Error ? e.message : 'Connection failed';
@@ -148,8 +183,10 @@ router.post('/test-key', async (req: Request, res: Response) => {
 
         valid = response.status === 200;
         if (!valid) {
-          const data = await response.json();
-          error = data.error?.message || `HTTP ${response.status}`;
+          const rawData = await response.json();
+          // Validate LLM API response against schema before using
+          const validatedError = safeValidate(OpenAIErrorSchema, rawData, 'OpenAI API response');
+          error = validatedError?.error?.message || `HTTP ${response.status}`;
         }
       } catch (e) {
         error = e instanceof Error ? e.message : 'Connection failed';
@@ -169,15 +206,14 @@ router.post('/test-key', async (req: Request, res: Response) => {
 
         valid = response.status === 200;
         if (!valid) {
-          const data = await response.json();
-          error = data.error?.message || `HTTP ${response.status}`;
+          const rawData = await response.json();
+          // Validate LLM API response against schema before using
+          const validatedError = safeValidate(OpenRouterErrorSchema, rawData, 'OpenRouter API response');
+          error = validatedError?.error?.message || `HTTP ${response.status}`;
         }
       } catch (e) {
         error = e instanceof Error ? e.message : 'Connection failed';
       }
-    } else {
-      res.status(400).json({ error: 'Unknown provider' });
-      return;
     }
 
     res.json({ valid, error });

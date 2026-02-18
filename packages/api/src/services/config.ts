@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import yaml from 'js-yaml';
 import type { Config, ConfigSummary } from '@shannon/shared';
+import { ConfigSchema, safeValidate } from '../schemas/index.js';
 
 // Shannon project root - must be configured via environment variable
 const SHANNON_ROOT = process.env.SHANNON_ROOT || path.resolve(process.cwd(), '..');
@@ -40,15 +41,20 @@ export class ConfigService {
 
           try {
             const content = await fs.readFile(filePath, 'utf8');
-            const parsed = yaml.load(content) as Config;
+            const rawParsed = yaml.load(content);
+            // Validate config against schema
+            const parsed = safeValidate(ConfigSchema, rawParsed, `config file ${file}`);
 
-            configs.push({
-              name: file.replace(/\.(yaml|yml)$/, ''),
-              path: file,
-              hasAuthentication: !!parsed?.authentication,
-              hasRules: !!(parsed?.rules?.avoid?.length || parsed?.rules?.focus?.length),
-              lastModified: stat.mtime.toISOString(),
-            });
+            if (parsed) {
+              configs.push({
+                name: file.replace(/\.(yaml|yml)$/, ''),
+                path: file,
+                hasAuthentication: !!parsed.authentication,
+                hasRules: !!(parsed.rules?.avoid?.length || parsed.rules?.focus?.length),
+                lastModified: stat.mtime.toISOString(),
+              });
+            }
+            // Skip configs that fail validation
           } catch {
             // Invalid YAML, skip
           }
@@ -78,10 +84,17 @@ export class ConfigService {
         : path.join(this.configsDir, `${name}.yml`);
 
       const raw = await fs.readFile(actualPath, 'utf8');
-      const config = yaml.load(raw) as Config;
+      const rawParsed = yaml.load(raw);
+      // Validate config against schema
+      const config = safeValidate(ConfigSchema, rawParsed, `config file ${name}`);
+
+      if (!config) {
+        console.warn(`Config ${name} failed schema validation`);
+        return null;
+      }
 
       // Mask sensitive fields
-      if (config?.authentication?.credentials) {
+      if (config.authentication?.credentials) {
         config.authentication.credentials = {
           ...config.authentication.credentials,
           password: '********',
@@ -89,7 +102,7 @@ export class ConfigService {
         };
       }
 
-      return { config, raw: this.maskYamlSecrets(raw) };
+      return { config: config as Config, raw: this.maskYamlSecrets(raw) };
     } catch {
       return null;
     }
@@ -103,8 +116,17 @@ export class ConfigService {
 
   async saveConfig(name: string, content: string): Promise<{ success: boolean; error?: string }> {
     try {
-      // Validate YAML
-      yaml.load(content);
+      // Parse and validate YAML against schema
+      const rawParsed = yaml.load(content);
+      const validationResult = ConfigSchema.safeParse(rawParsed);
+
+      if (!validationResult.success) {
+        const issues = validationResult.error.issues.map(i => `${i.path.join('.')}: ${i.message}`);
+        return {
+          success: false,
+          error: `Config validation failed: ${issues.join(', ')}`,
+        };
+      }
 
       const filePath = path.join(this.configsDir, `${name}.yaml`);
       await fs.writeFile(filePath, content, 'utf8');

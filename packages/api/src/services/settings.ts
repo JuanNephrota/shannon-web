@@ -1,16 +1,14 @@
 import fs from 'fs/promises';
 import path from 'path';
+import {
+  SettingsSchema,
+  type Settings,
+  type ApiKeys,
+  safeParseJson,
+} from '../schemas/index.js';
 
-export interface ApiKeys {
-  anthropicApiKey?: string;
-  openaiApiKey?: string;
-  openrouterApiKey?: string;
-}
-
-export interface Settings {
-  apiKeys: ApiKeys;
-  routerDefault?: string; // e.g., "openai,gpt-4o" or "openrouter,google/gemini-2.0-flash"
-}
+// Re-export types for backwards compatibility
+export type { Settings, ApiKeys } from '../schemas/index.js';
 
 // Settings file path - stored in current working directory (not committed to git)
 const SETTINGS_FILE = process.env.SETTINGS_FILE || path.join(process.cwd(), '.shannon-settings.json');
@@ -25,23 +23,35 @@ class SettingsService {
     if (this.loaded) return;
 
     try {
-      const data = await fs.readFile(SETTINGS_FILE, 'utf8');
-      this.settings = JSON.parse(data);
-      this.loaded = true;
-      console.log('Loaded settings from', SETTINGS_FILE);
+      const rawData = await fs.readFile(SETTINGS_FILE, 'utf8');
+      // Validate settings file against schema before using
+      const validatedSettings = safeParseJson(SettingsSchema, rawData, 'settings file');
+      if (validatedSettings) {
+        this.settings = validatedSettings;
+        this.loaded = true;
+        console.log('Loaded settings from', SETTINGS_FILE);
+      } else {
+        // Schema validation failed, fall back to defaults
+        console.warn('Settings file failed validation, using defaults');
+        this.loadDefaults();
+      }
     } catch {
       // File doesn't exist or is invalid, use defaults
-      // Also try to load from environment variables
-      this.settings = {
-        apiKeys: {
-          anthropicApiKey: process.env.ANTHROPIC_API_KEY,
-          openaiApiKey: process.env.OPENAI_API_KEY,
-          openrouterApiKey: process.env.OPENROUTER_API_KEY,
-        },
-        routerDefault: process.env.ROUTER_DEFAULT,
-      };
-      this.loaded = true;
+      this.loadDefaults();
     }
+  }
+
+  private loadDefaults(): void {
+    // Load from environment variables as fallback
+    this.settings = {
+      apiKeys: {
+        anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+        openaiApiKey: process.env.OPENAI_API_KEY,
+        openrouterApiKey: process.env.OPENROUTER_API_KEY,
+      },
+      routerDefault: process.env.ROUTER_DEFAULT,
+    };
+    this.loaded = true;
   }
 
   async save(): Promise<void> {
