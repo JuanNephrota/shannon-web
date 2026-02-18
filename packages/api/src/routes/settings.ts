@@ -3,6 +3,28 @@ import { settingsService } from '../services/settings.js';
 
 const router: Router = Router();
 
+/**
+ * LLM Provider Data Privacy Notes:
+ *
+ * This application uses LLM provider API endpoints (NOT playground/consumer products).
+ * API usage has different data retention and training policies:
+ *
+ * - Anthropic API: Data is NOT used for training models by default.
+ *   See: https://www.anthropic.com/legal/privacy
+ *
+ * - OpenAI API: Data is NOT used for training models by default (as of March 2023).
+ *   Enterprise customers have additional data protections.
+ *   See: https://openai.com/enterprise-privacy
+ *
+ * - OpenRouter: Acts as a proxy; follows underlying provider policies.
+ *   See: https://openrouter.ai/privacy
+ *
+ * For maximum privacy:
+ * - Use organization IDs with explicit opt-out settings where available
+ * - Avoid sending sensitive PII in prompts
+ * - Review each provider's current data usage policy
+ */
+
 // Get current settings (with masked API keys)
 router.get('/', async (_req: Request, res: Response) => {
   try {
@@ -79,6 +101,8 @@ router.post('/test-key', async (req: Request, res: Response) => {
 
     if (provider === 'anthropic') {
       // Test Anthropic API key
+      // Note: Anthropic API does NOT use data for training by default.
+      // Using minimal test message to validate key.
       try {
         const response = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
@@ -86,11 +110,12 @@ router.post('/test-key', async (req: Request, res: Response) => {
             'Content-Type': 'application/json',
             'x-api-key': apiKey,
             'anthropic-version': '2023-06-01',
+            // Anthropic API has built-in privacy: no training on API data
           },
           body: JSON.stringify({
             model: 'claude-3-haiku-20240307',
             max_tokens: 1,
-            messages: [{ role: 'user', content: 'Hi' }],
+            messages: [{ role: 'user', content: 'test' }],
           }),
         });
 
@@ -104,12 +129,21 @@ router.post('/test-key', async (req: Request, res: Response) => {
         error = e instanceof Error ? e.message : 'Connection failed';
       }
     } else if (provider === 'openai') {
-      // Test OpenAI API key
+      // Test OpenAI API key using models endpoint (no data sent)
+      // Note: OpenAI API does NOT use data for training by default (since March 2023)
+      // For enterprise compliance, configure organization settings in OpenAI dashboard
       try {
+        const headers: Record<string, string> = {
+          Authorization: `Bearer ${apiKey}`,
+        };
+        // Support optional organization ID for enterprise privacy controls
+        const orgId = process.env.OPENAI_ORG_ID;
+        if (orgId) {
+          headers['OpenAI-Organization'] = orgId;
+        }
+
         const response = await fetch('https://api.openai.com/v1/models', {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-          },
+          headers,
         });
 
         valid = response.status === 200;
@@ -121,11 +155,15 @@ router.post('/test-key', async (req: Request, res: Response) => {
         error = e instanceof Error ? e.message : 'Connection failed';
       }
     } else if (provider === 'openrouter') {
-      // Test OpenRouter API key
+      // Test OpenRouter API key using models endpoint (no data sent)
+      // Note: OpenRouter proxies to underlying providers; follows their policies
       try {
         const response = await fetch('https://openrouter.ai/api/v1/models', {
           headers: {
             Authorization: `Bearer ${apiKey}`,
+            // OpenRouter app identification for request tracking
+            'HTTP-Referer': process.env.APP_URL || 'http://localhost:3001',
+            'X-Title': 'Shannon Web',
           },
         });
 

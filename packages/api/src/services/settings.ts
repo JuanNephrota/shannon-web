@@ -101,6 +101,7 @@ class SettingsService {
   }
 
   // Get environment variables to pass to worker process
+  // Note: LLM providers use API endpoints with default training opt-out
   getWorkerEnv(): Record<string, string> {
     const env: Record<string, string> = {};
 
@@ -115,6 +116,10 @@ class SettingsService {
     }
     if (this.settings.routerDefault) {
       env.ROUTER_DEFAULT = this.settings.routerDefault;
+    }
+    // Pass OpenAI organization ID for enterprise privacy controls
+    if (process.env.OPENAI_ORG_ID) {
+      env.OPENAI_ORG_ID = process.env.OPENAI_ORG_ID;
     }
 
     return env;
