@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Play, FileCode, List, Server, Loader2, Key, ExternalLink } from 'lucide-react';
+import { LayoutDashboard, Play, FileCode, List, Server, Loader2, Key, ExternalLink, Users, LogOut, User } from 'lucide-react';
 import { useWorkerStatus, useStartWorker, useStopWorker } from '@/api/hooks';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -22,6 +23,7 @@ export default function Layout({ children }: LayoutProps) {
   const { data: workerStatus } = useWorkerStatus();
   const startWorker = useStartWorker();
   const stopWorker = useStopWorker();
+  const { user, isAdmin, logout } = useAuth();
 
   const isWorkerRunning = workerStatus?.running ?? false;
   const isLoading = startWorker.isPending || stopWorker.isPending;
@@ -32,6 +34,10 @@ export default function Layout({ children }: LayoutProps) {
     } else {
       startWorker.mutate();
     }
+  };
+
+  const handleLogout = async () => {
+    await logout();
   };
 
   return (
@@ -66,6 +72,22 @@ export default function Layout({ children }: LayoutProps) {
                 </li>
               );
             })}
+            {isAdmin && (
+              <li>
+                <Link
+                  to="/users"
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors text-sm font-medium",
+                    location.pathname === '/users'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  )}
+                >
+                  <Users className="h-5 w-5" />
+                  <span>Users</span>
+                </Link>
+              </li>
+            )}
           </ul>
         </nav>
 
@@ -126,6 +148,28 @@ export default function Layout({ children }: LayoutProps) {
             <ExternalLink className="h-4 w-4" />
             Temporal UI
           </a>
+        </div>
+
+        {/* User section */}
+        <div className="p-4 border-t border-slate-800">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center">
+              <User className="h-4 w-4 text-slate-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">{user?.username}</p>
+              <p className="text-xs text-slate-400">{isAdmin ? 'Admin' : 'User'}</p>
+            </div>
+          </div>
+          <Button
+            onClick={handleLogout}
+            variant="outline"
+            size="sm"
+            className="w-full border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Sign Out
+          </Button>
         </div>
       </aside>
 

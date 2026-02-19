@@ -2,12 +2,20 @@ const API_BASE = '/api';
 
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
+    credentials: 'include', // Include cookies for session auth
     headers: {
       'Content-Type': 'application/json',
       ...options?.headers,
     },
     ...options,
   });
+
+  // Handle authentication errors
+  if (response.status === 401) {
+    // Redirect to login page on auth failure
+    window.location.href = '/login';
+    throw new Error('Authentication required');
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Request failed' }));
@@ -37,7 +45,13 @@ export const api = {
     fetchApi<{ deliverables: Deliverable[] }>(`/workflows/${workflowId}/deliverables`),
 
   getDeliverable: async (workflowId: string, filePath: string): Promise<string> => {
-    const response = await fetch(`${API_BASE}/workflows/${workflowId}/deliverables/${filePath}`);
+    const response = await fetch(`${API_BASE}/workflows/${workflowId}/deliverables/${filePath}`, {
+      credentials: 'include',
+    });
+    if (response.status === 401) {
+      window.location.href = '/login';
+      throw new Error('Authentication required');
+    }
     if (!response.ok) throw new Error('Failed to fetch deliverable');
     return response.text();
   },

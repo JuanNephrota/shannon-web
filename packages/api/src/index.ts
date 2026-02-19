@@ -6,6 +6,10 @@ import { fileURLToPath } from 'url';
 import { temporalService } from './services/temporal.js';
 import { workerService } from './services/worker.js';
 import { settingsService } from './services/settings.js';
+import { authService } from './services/auth.js';
+import { createSessionMiddleware } from './services/session.js';
+import { requireAuth } from './middleware/requireAuth.js';
+import authRouter from './routes/auth.js';
 import workflowsRouter from './routes/workflows.js';
 import configsRouter from './routes/configs.js';
 import workerRouter from './routes/worker.js';
@@ -58,19 +62,24 @@ app.use(
   })
 );
 
-// CORS middleware
-app.use(cors());
+// CORS middleware - configure for credentials (cookies)
+app.use(
+  cors({
+    origin: isProduction ? true : ['http://localhost:5173', 'http://localhost:3001'],
+    credentials: true, // Allow cookies to be sent
+  })
+);
 
 // JSON body parser
 app.use(express.json());
 
-// API routes
-app.use('/api/workflows', workflowsRouter);
-app.use('/api/configs', configsRouter);
-app.use('/api/worker', workerRouter);
-app.use('/api/settings', settingsRouter);
+// Session middleware - must be before routes
+app.use(createSessionMiddleware());
 
-// Health check
+// Public routes (no authentication required)
+app.use('/api/auth', authRouter);
+
+// Health check (public)
 app.get('/api/health', (_req, res) => {
   const workerStatus = workerService.getStatus();
   res.json({
@@ -79,6 +88,12 @@ app.get('/api/health', (_req, res) => {
     worker: workerStatus.running,
   });
 });
+
+// Protected API routes (authentication required)
+app.use('/api/workflows', requireAuth, workflowsRouter);
+app.use('/api/configs', requireAuth, configsRouter);
+app.use('/api/worker', requireAuth, workerRouter);
+app.use('/api/settings', requireAuth, settingsRouter);
 
 // Serve static frontend in production
 if (process.env.NODE_ENV === 'production') {
@@ -99,6 +114,9 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 
 async function start() {
   try {
+    // Initialize auth service (loads users, bootstraps admin if needed)
+    await authService.initialize();
+
     // Load settings
     await settingsService.load();
 
