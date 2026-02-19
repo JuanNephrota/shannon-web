@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { temporalService } from './services/temporal.js';
@@ -14,9 +15,53 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const isProduction = process.env.NODE_ENV === 'production';
 
-// Middleware
+// Security middleware - Helmet sets various HTTP security headers
+// See: https://helmetjs.github.io/
+app.use(
+  helmet({
+    // Content Security Policy - configured for SPA with API
+    contentSecurityPolicy: isProduction
+      ? {
+          directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"], // Allow inline styles for UI frameworks
+            imgSrc: ["'self'", 'data:', 'blob:'],
+            fontSrc: ["'self'"],
+            connectSrc: ["'self'"],
+            frameSrc: ["'none'"],
+            objectSrc: ["'none'"],
+            upgradeInsecureRequests: [],
+          },
+        }
+      : false, // Disable CSP in development for hot reload
+    // HTTP Strict Transport Security - enforce HTTPS in production
+    hsts: isProduction
+      ? {
+          maxAge: 31536000, // 1 year
+          includeSubDomains: true,
+          preload: true,
+        }
+      : false,
+    // Prevent clickjacking
+    frameguard: { action: 'deny' },
+    // Disable X-Powered-By header
+    hidePoweredBy: true,
+    // Prevent MIME type sniffing
+    noSniff: true,
+    // XSS filter (legacy browsers)
+    xssFilter: true,
+    // Referrer policy
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  })
+);
+
+// CORS middleware
 app.use(cors());
+
+// JSON body parser
 app.use(express.json());
 
 // API routes
