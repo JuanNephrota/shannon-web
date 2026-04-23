@@ -14,12 +14,21 @@ import {
   type StoredUser,
   type UsersFile,
   type CreateUserInput,
+  type UpdateUserInput,
+  type UpdateProfileInput,
   type UserResponse,
   toUserResponse,
 } from '../schemas/auth.js';
 
 const BCRYPT_ROUNDS = 12;
 const USERS_FILE = process.env.USERS_FILE || path.join(process.env.HOME || '', '.shannon-users.json');
+
+export class LastAdminError extends Error {
+  constructor(msg = 'Cannot leave the system without any enabled admins') {
+    super(msg);
+    this.name = 'LastAdminError';
+  }
+}
 
 class AuthService {
   private users: StoredUser[] = [];
@@ -126,8 +135,10 @@ class AuthService {
       email: input.email || null,
       passwordHash,
       isAdmin: input.isAdmin ?? false,
+      disabled: false,
       createdAt: new Date().toISOString(),
       createdBy,
+      lastLoginAt: null,
     };
 
     this.users.push(user);
@@ -137,7 +148,7 @@ class AuthService {
   }
 
   /**
-   * Verify a user's password.
+   * Verify a user's password. Refuses disabled accounts.
    */
   async verifyPassword(username: string, password: string): Promise<StoredUser | null> {
     const user = this.users.find((u) => u.username.toLowerCase() === username.toLowerCase());
@@ -147,8 +158,22 @@ class AuthService {
       return null;
     }
 
+    if (user.disabled) {
+      // Still do the hash so we don't leak existence via timing.
+      await bcrypt.compare(password, user.passwordHash);
+      return null;
+    }
+
     const valid = await bcrypt.compare(password, user.passwordHash);
     return valid ? user : null;
+  }
+
+  /** Stamp the user's most-recent successful login. */
+  async recordLogin(userId: string): Promise<void> {
+    const user = this.users.find((u) => u.id === userId);
+    if (!user) return;
+    user.lastLoginAt = new Date().toISOString();
+    await this.saveUsers();
   }
 
   /**
@@ -173,6 +198,86 @@ class AuthService {
   }
 
   /**
+   * Admin-initiated edit: email, admin flag, disabled flag.
+   * Enforces the "at least one enabled admin exists" invariant.
+   */
+  async updateUser(
+    id: string,
+    input: UpdateUserInput
+  ): Promise<UserResponse | null> {
+    const user = this.users.find((u) => u.id === id);
+    if (!user) return null;
+
+    // Predict post-change state for admin invariant.
+    const willBeAdmin = input.isAdmin ?? user.isAdmin;
+    const willBeDisabled = input.disabled ?? user.disabled ?? false;
+
+    const otherEnabledAdmins = this.users.filter(
+      (u) => u.id !== id && u.isAdmin && !(u.disabled ?? false)
+    ).length;
+
+    // If this change would remove the user's effective admin status,
+    // the system must still have at least one other enabled admin.
+    const wasEffectiveAdmin = user.isAdmin && !(user.disabled ?? false);
+    const willBeEffectiveAdmin = willBeAdmin && !willBeDisabled;
+
+    if (wasEffectiveAdmin && !willBeEffectiveAdmin && otherEnabledAdmins === 0) {
+      throw new LastAdminError();
+    }
+
+    if (input.email !== undefined) user.email = input.email;
+    if (input.isAdmin !== undefined) user.isAdmin = input.isAdmin;
+    if (input.disabled !== undefined) user.disabled = input.disabled;
+
+    await this.saveUsers();
+    return toUserResponse(user);
+  }
+
+  /**
+   * Admin-initiated password reset. Does NOT log the target user out —
+   * their existing sessions continue to work until they expire or they
+   * log out manually. Anyone worried about that should disable the
+   * account and re-enable after contact.
+   */
+  async resetPassword(id: string, newPassword: string): Promise<boolean> {
+    const user = this.users.find((u) => u.id === id);
+    if (!user) return false;
+    user.passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await this.saveUsers();
+    return true;
+  }
+
+  /**
+   * Self-service: change own password. Requires correct current password.
+   * Returns false if the current password doesn't match.
+   */
+  async changeOwnPassword(
+    id: string,
+    currentPassword: string,
+    newPassword: string
+  ): Promise<boolean> {
+    const user = this.users.find((u) => u.id === id);
+    if (!user) return false;
+    const ok = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!ok) return false;
+    user.passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await this.saveUsers();
+    return true;
+  }
+
+  /** Self-service profile edit (currently: email). */
+  async updateOwnProfile(
+    id: string,
+    input: UpdateProfileInput
+  ): Promise<UserResponse | null> {
+    const user = this.users.find((u) => u.id === id);
+    if (!user) return null;
+    if (input.email !== undefined) user.email = input.email;
+    await this.saveUsers();
+    return toUserResponse(user);
+  }
+
+  /**
    * Delete a user by ID.
    */
   async deleteUser(id: string): Promise<boolean> {
@@ -194,10 +299,15 @@ class AuthService {
   }
 
   /**
-   * Get count of admin users.
+   * Get count of admin users (includes disabled admins).
    */
   getAdminCount(): number {
     return this.users.filter((u) => u.isAdmin).length;
+  }
+
+  /** Count of admins that can actually sign in right now. */
+  getEnabledAdminCount(): number {
+    return this.users.filter((u) => u.isAdmin && !(u.disabled ?? false)).length;
   }
 }
 

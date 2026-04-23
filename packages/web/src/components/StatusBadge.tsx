@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 
 interface StatusBadgeProps {
@@ -6,31 +5,36 @@ interface StatusBadgeProps {
   size?: 'sm' | 'md';
 }
 
+/**
+ * Signal dot + stamped label. The "running" dot pulses in signal-amber
+ * — it's the heartbeat of the terminal, the one moment of motion the
+ * user should feel present at all times.
+ */
 const statusConfig = {
   running: {
-    label: 'Running',
-    className: 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100',
-    showPulse: true,
+    label: 'RUNNING',
+    dot: 'bg-signal-400 animate-signal-pulse',
+    frame: 'border-signal-400/60 text-signal-300 bg-signal-400/5',
   },
   completed: {
-    label: 'Completed',
-    className: 'bg-green-100 text-green-800 border-green-200 hover:bg-green-100',
-    showPulse: false,
+    label: 'COMPLETE',
+    dot: 'bg-go-400',
+    frame: 'border-go-500/40 text-go-400 bg-go-500/5',
   },
   failed: {
-    label: 'Failed',
-    className: 'bg-red-100 text-red-800 border-red-200 hover:bg-red-100',
-    showPulse: false,
+    label: 'FAILED',
+    dot: 'bg-alert-400',
+    frame: 'border-alert-500/50 text-alert-400 bg-alert-500/5',
   },
   pending: {
-    label: 'Pending',
-    className: 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-100',
-    showPulse: false,
+    label: 'QUEUED',
+    dot: 'bg-wait-400',
+    frame: 'border-wait-500/40 text-wait-400 bg-wait-500/5',
   },
   unknown: {
-    label: 'Unknown',
-    className: 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-100',
-    showPulse: false,
+    label: 'UNKNOWN',
+    dot: 'bg-paper-500',
+    frame: 'border-ink-400 text-paper-400 bg-transparent',
   },
 };
 
@@ -38,18 +42,24 @@ export default function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
   const config = statusConfig[status];
 
   return (
-    <Badge
-      variant="outline"
+    <span
       className={cn(
-        "gap-1.5 rounded-full",
-        config.className,
-        size === 'sm' && "text-xs px-2 py-0.5"
+        "inline-flex items-center gap-2 border",
+        "font-mono font-medium uppercase tracking-[0.22em] leading-none",
+        config.frame,
+        size === 'sm'
+          ? "text-[9px] px-2 py-[3px]"
+          : "text-[10px] px-2.5 py-[5px]"
       )}
     >
-      {config.showPulse && (
-        <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-      )}
+      <span
+        className={cn(
+          "inline-block rounded-full",
+          size === 'sm' ? "h-1.5 w-1.5" : "h-2 w-2",
+          config.dot
+        )}
+      />
       {config.label}
-    </Badge>
+    </span>
   );
 }

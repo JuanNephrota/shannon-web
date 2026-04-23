@@ -41,6 +41,40 @@ export interface PipelineProgress extends PipelineState {
   elapsedMs: number;
 }
 
+// ─────────────────────────────────────────────────────────────
+// Live workflow feed events
+//
+// The API server streams these over SSE at /api/workflows/:id/events.
+// Each event has a `ts` timestamp (ms since epoch) and a tagged `kind`.
+// The client renders them into a terminal-style feed.
+// ─────────────────────────────────────────────────────────────
+
+export type WorkflowEvent =
+  | { kind: 'snapshot'; ts: number; progress: PipelineProgress; recentLogs: string[] }
+  | { kind: 'phase-change'; ts: number; from: string | null; to: string | null }
+  | { kind: 'agent-start'; ts: number; agent: string; phase: string | null }
+  | {
+      kind: 'agent-complete';
+      ts: number;
+      agent: string;
+      durationMs: number;
+      costUsd: number | null;
+    }
+  | { kind: 'agent-failed'; ts: number; agent: string; error: string | null }
+  | { kind: 'cost-delta'; ts: number; delta: number; total: number }
+  | { kind: 'log'; ts: number; stream: 'stdout' | 'stderr' | 'system'; line: string }
+  | {
+      kind: 'finished';
+      ts: number;
+      status: 'completed' | 'failed';
+      totalCostUsd: number;
+      totalDurationMs: number;
+    }
+  | { kind: 'error'; ts: number; message: string }
+  | { kind: 'heartbeat'; ts: number };
+
+export type WorkflowEventKind = WorkflowEvent['kind'];
+
 // Agent types
 export type AgentName =
   | 'pre-recon'

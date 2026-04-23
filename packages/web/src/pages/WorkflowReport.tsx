@@ -1,84 +1,112 @@
 import { useParams, Link } from 'react-router-dom';
-import { useDeliverables, useDeliverable } from '@/api/hooks';
 import ReactMarkdown from 'react-markdown';
+import { ArrowLeft, Download, FileText, Sparkles } from 'lucide-react';
+import { useDeliverables, useDeliverable } from '@/api/hooks';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Download } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function WorkflowReport() {
   const { workflowId } = useParams<{ workflowId: string }>();
   const { data: deliverablesData } = useDeliverables(workflowId);
 
   const deliverables = deliverablesData?.deliverables || [];
-  const reportFile = deliverables.find(
-    (d) => d.type === 'report' && (d.name.includes('executive') || d.name.includes('report'))
-  ) || deliverables.find((d) => d.type === 'report');
+  const reportFile =
+    deliverables.find(
+      (d) =>
+        d.type === 'report' &&
+        (d.name.includes('executive') || d.name.includes('report'))
+    ) || deliverables.find((d) => d.type === 'report');
 
-  const { data: reportContent, isLoading, error } = useDeliverable(
-    workflowId,
-    reportFile?.path
-  );
+  const {
+    data: reportContent,
+    isLoading,
+    error,
+  } = useDeliverable(workflowId, reportFile?.path);
 
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-96" />
+        <Skeleton className="h-6 w-64" />
+        <Skeleton className="h-[480px] w-full" />
       </div>
     );
   }
 
   if (error || !reportContent) {
     return (
-      <div className="text-center py-12">
-        <h2 className="text-xl font-semibold mb-2">Report not available</h2>
-        <p className="text-muted-foreground mb-4">
-          The report may not have been generated yet or the workflow is still running.
+      <div className="max-w-xl mx-auto py-24 text-center">
+        <div className="label-stamp text-paper-500 mb-4">// No report</div>
+        <h2 className="font-display text-3xl font-medium text-paper-0 leading-tight">
+          Report not yet available.
+        </h2>
+        <p className="mt-3 font-mono text-[12px] text-paper-500">
+          The executive report hasn't been generated, or this workflow is still
+          running.
         </p>
-        <Button variant="link" asChild>
-          <Link to={`/workflows/${workflowId}`}>Back to workflow</Link>
+        <Button asChild variant="outline" size="lg" className="mt-8">
+          <Link to={`/workflows/${workflowId}`}>
+            <ArrowLeft className="h-4 w-4" />
+            Back to Operation
+          </Link>
         </Button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <Button variant="ghost" size="sm" asChild className="mb-2 -ml-2">
-            <Link to={`/workflows/${workflowId}`}>
-              <ArrowLeft className="h-4 w-4" />
-              Back to workflow
-            </Link>
-          </Button>
-          <h1 className="text-2xl font-bold">Security Report</h1>
-          <p className="text-muted-foreground mt-1 font-mono text-sm">{workflowId}</p>
+      <header className="space-y-4">
+        <Link
+          to={`/workflows/${workflowId}`}
+          className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-paper-500 hover:text-signal-300 transition-colors"
+        >
+          <ArrowLeft className="h-3 w-3" />
+          Operation
+        </Link>
+
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <div className="label-stamp-signal flex items-center gap-2 mb-2">
+              <Sparkles className="h-3 w-3" />
+              // Executive Report
+            </div>
+            <h1 className="font-display text-5xl font-medium leading-[0.95] text-paper-0 tracking-[-0.02em]">
+              Security findings<span className="text-signal-400">.</span>
+            </h1>
+            <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.2em] text-paper-500 break-all">
+              {workflowId}
+            </p>
+          </div>
+          {reportFile && (
+            <Button variant="outline" size="lg" asChild>
+              <a
+                href={`/api/workflows/${workflowId}/deliverables/${reportFile.path}`}
+                download
+              >
+                <Download className="h-4 w-4" />
+                Download Markdown
+              </a>
+            </Button>
+          )}
         </div>
+      </header>
 
-        {reportFile && (
-          <Button variant="outline" asChild>
-            <a
-              href={`/api/workflows/${workflowId}/deliverables/${reportFile.path}`}
-              download
-            >
-              <Download className="h-4 w-4" />
-              Download Markdown
-            </a>
-          </Button>
-        )}
-      </div>
+      <Alert variant="signal">
+        <FileText />
+        <AlertTitle>// Scope</AlertTitle>
+        <AlertDescription>
+          Generated by Shannon's reporting agent at the close of the run.
+          Findings are provisional — verify each reproducible step before
+          acting. Nothing below is disclosed externally without your approval.
+        </AlertDescription>
+      </Alert>
 
-      {/* Report Content */}
-      <Card>
-        <CardContent className="p-8">
-          <article className="prose prose-gray dark:prose-invert max-w-none prose-headings:text-foreground prose-a:text-primary prose-code:text-foreground prose-pre:bg-muted">
-            <ReactMarkdown>{reportContent}</ReactMarkdown>
-          </article>
-        </CardContent>
-      </Card>
+      {/* Report — styled via .prose rules in src/index.css + report-body below */}
+      <article className="report-body relative border border-border bg-card px-6 md:px-10 py-8 md:py-10 prose max-w-none">
+        <ReactMarkdown>{reportContent}</ReactMarkdown>
+      </article>
     </div>
   );
 }

@@ -36,6 +36,14 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     return;
   }
 
+  // A user disabled after the session was issued is effectively signed out.
+  if (user.disabled) {
+    req.session.destroy(() => {
+      res.status(401).json({ error: 'Account disabled' });
+    });
+    return;
+  }
+
   // Attach user to request (safe format, no password hash)
   req.user = toUserResponse(user);
   next();

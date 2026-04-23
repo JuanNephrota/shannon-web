@@ -10,6 +10,8 @@ import WorkflowNew from './pages/WorkflowNew';
 import WorkflowDetail from './pages/WorkflowDetail';
 import WorkflowReport from './pages/WorkflowReport';
 import ConfigList from './pages/ConfigList';
+import ConfigBuilder from './pages/ConfigBuilder';
+import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 
 export default function App() {
@@ -32,7 +34,9 @@ export default function App() {
                   <Route path="/workflows/:workflowId" element={<WorkflowDetail />} />
                   <Route path="/workflows/:workflowId/report" element={<WorkflowReport />} />
                   <Route path="/configs" element={<ConfigList />} />
+                  <Route path="/configs/new" element={<ConfigBuilder />} />
                   <Route path="/settings" element={<Settings />} />
+                  <Route path="/profile" element={<Profile />} />
                   <Route
                     path="/users"
                     element={

@@ -3,16 +3,29 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Alert — a framed notice stamped with a leading rule on the left edge.
+ * Carries a small-caps STATUS marker and maintains field-terminal feel.
+ */
 const alertVariants = cva(
-  "relative w-full rounded-lg border px-4 py-3 text-sm [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-foreground [&>svg~*]:pl-7",
+  [
+    "relative w-full px-4 py-3 pl-5 text-[13px]",
+    "font-mono border",
+    "[&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:h-4 [&>svg]:w-4",
+    "[&>svg~*]:pl-7",
+    "before:absolute before:inset-y-0 before:left-0 before:w-[3px]",
+  ].join(" "),
   {
     variants: {
       variant: {
-        default: "bg-background text-foreground",
+        default:
+          "bg-ink-100/60 text-paper-0 border-ink-400 before:bg-ink-400",
         destructive:
-          "border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive",
+          "bg-alert-500/[0.06] text-alert-400 border-alert-500/50 before:bg-alert-500 [&>svg]:text-alert-400",
         warning:
-          "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100 [&>svg]:text-amber-600",
+          "bg-wait-500/[0.06] text-wait-400 border-wait-500/50 before:bg-wait-500 [&>svg]:text-wait-400",
+        signal:
+          "bg-signal-400/[0.06] text-signal-300 border-signal-400/50 before:bg-signal-400 [&>svg]:text-signal-400",
       },
     },
     defaultVariants: {
@@ -40,7 +53,10 @@ const AlertTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <h5
     ref={ref}
-    className={cn("mb-1 font-medium leading-none tracking-tight", className)}
+    className={cn(
+      "mb-1 font-mono text-[10px] font-medium uppercase tracking-[0.22em] leading-none",
+      className
+    )}
     {...props}
   />
 ))
@@ -52,7 +68,7 @@ const AlertDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("text-sm [&_p]:leading-relaxed", className)}
+    className={cn("text-[13px] leading-relaxed [&_p]:leading-relaxed", className)}
     {...props}
   />
 ))

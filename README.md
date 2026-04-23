@@ -1,16 +1,38 @@
 # Shannon Web
 
-Web frontend for [Shannon](https://github.com/your-org/shannon) - AI-powered penetration testing.
+Web frontend for [Shannon](https://github.com/your-org/shannon) — AI‑powered penetration testing.
+
+A field‑terminal style operator console for driving Shannon pentests: kick
+off operations, watch agents work in real time, review deliverables, and
+manage operator accounts.
 
 ## Overview
 
-This is a standalone web application for managing Shannon pentest workflows. It provides:
+Shannon Web provides:
 
-- **Dashboard** - Overview of running and completed workflows
-- **Workflow Management** - Start new pentests, monitor progress, view reports
-- **Configuration** - Manage pentest configuration files
-- **Settings** - Configure API keys for LLM providers
-- **User Authentication** - Multi-user support with session-based authentication
+- **Dashboard** — at‑a‑glance view of in‑flight and completed operations, with
+  per‑run status, cost, and a running‑count badge that pulses while the pipeline
+  is active.
+- **Live workflow feed** — a streaming terminal console on each running
+  operation's detail page. Phase transitions, agent starts / completions /
+  failures, cost deltas, and raw worker stdout all flow in over
+  Server‑Sent Events.
+- **Guided config builder** — draft and save Shannon YAML configs through a
+  guided form with a live YAML preview; no hand‑editing required.
+- **Workflow management** — start new pentests, monitor progress, browse the
+  full archive, and drill into session metrics, agent progression, and
+  deliverables.
+- **Reports** — executive markdown reports rendered in‑aesthetic, with a
+  one‑click download.
+- **Configurations** — list, inspect, and delete YAML profiles that Shannon
+  consumes (authentication flow, scope rules).
+- **Settings** — manage API keys for Anthropic / OpenAI / OpenRouter, test
+  them in place, and choose a default LLM router.
+- **User management** — admins create / edit / delete operators, reset
+  passwords, toggle admin clearance, and disable accounts without deleting
+  them (sessions for disabled accounts are invalidated on the next request).
+- **Self‑service profile** — every operator can update their own email and
+  rotate their passphrase without asking an admin.
 
 ## Quick Start with Docker
 
@@ -126,6 +148,17 @@ pnpm build
 pnpm start  # Serves both API and static frontend on port 3001
 ```
 
+### Troubleshooting: `sqlite3` native bindings
+
+If the API fails on startup with `Error: Could not locate the bindings file`
+for `sqlite3`, the prebuilt native binary doesn't match your installed Node
+version. Rebuild it:
+
+```bash
+cd node_modules/.pnpm/sqlite3@*/node_modules/sqlite3
+npm run install
+```
+
 ## Configuration
 
 ### Environment Variables
@@ -151,27 +184,80 @@ API keys can be configured either:
 - Via the Settings page in the web UI
 - Via environment variables (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY`)
 
-### Authentication
+### Authentication & User Management
 
 Shannon Web requires authentication to access. On first startup:
 
-1. If no users exist, an admin user is created from `ADMIN_USERNAME` and `ADMIN_PASSWORD` environment variables
-2. Visit the login page and sign in with the admin credentials
-3. Navigate to **Users** (admin only) to create additional user accounts
+1. If no users exist, an admin user is created from `ADMIN_USERNAME` and
+   `ADMIN_PASSWORD` environment variables.
+2. Visit the login page and sign in with the admin credentials.
+3. Navigate to **Users** (admin only) to register additional operators.
+
+Admins can:
+
+- Create new operators (username, password, optional email, admin clearance)
+- **Reset passwords** for any operator
+- **Toggle admin clearance** on any operator (except themselves)
+- **Disable / re‑enable accounts** — preferable to deletion when an operator
+  is stepping away; preserves audit‑log attribution. A disabled account's
+  existing sessions are invalidated on the next request.
+- **Delete operators** — destructive; blocked for the current user and for the
+  last remaining enabled admin
+
+Every operator — admin or not — can use the **Profile** page (click the
+avatar in the sidebar) to:
+
+- Update their contact email
+- Rotate their passphrase (requires the current passphrase)
 
 **Security notes:**
 - Passwords are hashed with bcrypt (cost factor 12)
-- Sessions use HTTP-only, secure (in production), SameSite=strict cookies
+- Sessions use HTTP‑only, secure (in production), SameSite=strict cookies
 - Sessions are stored in SQLite for persistence across restarts
-- Only admins can create, list, or delete user accounts
+- The system always retains at least one enabled admin; edits that would
+  violate this are rejected with a 400
+- Admins cannot demote or disable themselves (prevents accidental lockout)
+- `lastLoginAt` is recorded on every successful login
+
+## Live Workflow Feed
+
+While a workflow is running, the detail page streams events via Server‑Sent
+Events at `GET /api/workflows/:workflowId/events`. The server:
+
+- Sends an initial snapshot (progress + recent worker logs)
+- Polls Temporal's progress query every 1.5s and diffs against the prior state
+- Emits typed events (`phase-change`, `agent-start`, `agent-complete`,
+  `agent-failed`, `cost-delta`, `finished`, `error`) plus raw worker
+  `stdout` / `stderr` lines as they arrive
+- Heartbeats every 10s; closes cleanly when the workflow finishes or the
+  client disconnects
+- Falls back to audit‑logs for completed workflows Temporal no longer retains
+
+The frontend renders the stream as a terminal‑style feed with per‑event‑kind
+color coding and auto‑scroll.
+
+## Guided Config Builder
+
+`/configs/new` is a guided form that composes a Shannon YAML config without
+hand‑editing. It covers:
+
+- **Authentication** — login type, URL, credentials (with optional TOTP
+  secret), a numbered natural‑language login flow, and a success condition
+  matching Shannon's Zod schema (`url | cookie | element | redirect`)
+- **Rules** — scoping `avoid` and `focus` lists with typed matchers
+  (`path | subdomain | domain | method | header | parameter`)
+
+A live YAML preview renders on the right with line numbers, light syntax
+coloring, a copy button, and a schema‑validity indicator. Save writes the
+file to `$SHANNON_ROOT/configs/<name>.yaml`.
 
 ## Architecture
 
 ```
 shannon-web/
 ├── packages/
-│   ├── shared/    # Shared TypeScript types
-│   ├── api/       # Express API server
+│   ├── shared/    # Shared TypeScript types (pipeline progress, events)
+│   ├── api/       # Express API server + SSE + Temporal client
 │   └── web/       # React + Vite frontend
 ├── Dockerfile     # Multi-stage Docker build
 ├── docker-compose.yml
@@ -179,9 +265,18 @@ shannon-web/
 ```
 
 The API server connects to:
-- **Temporal** - For workflow orchestration
-- **Shannon audit-logs/** - For session data and deliverables
-- **Shannon configs/** - For pentest configuration files
+- **Temporal** — workflow orchestration and progress queries
+- **Shannon `audit-logs/`** — session metrics, deliverables, historical data
+- **Shannon `configs/`** — pentest configuration files
+- The **Shannon worker** (managed as a child process when run locally)
+
+## Design
+
+The UI is a distinctive "field terminal" aesthetic — warm ink‑and‑amber
+palette, JetBrains Mono for data with IBM Plex Serif for display type,
+stamped small‑caps labels, hairline borders, signal‑amber accents used
+sparingly to mark live run state. See `packages/web/src/index.css` and
+`packages/web/tailwind.config.js` for tokens.
 
 ## Building Docker Image Manually
 
@@ -200,4 +295,4 @@ docker run -d \
 
 ## License
 
-AGPL-3.0 - See Shannon project for details.
+AGPL-3.0 — see Shannon project for details.

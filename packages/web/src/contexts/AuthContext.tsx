@@ -3,14 +3,7 @@
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-
-interface User {
-  id: string;
-  username: string;
-  email: string | null;
-  isAdmin: boolean;
-  createdAt: string;
-}
+import type { User } from '../api/client';
 
 interface AuthContextType {
   user: User | null;

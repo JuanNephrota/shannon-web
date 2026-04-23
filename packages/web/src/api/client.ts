@@ -105,6 +105,37 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ provider, apiKey }),
     }),
+
+  // Auth / users
+  listUsers: () => fetchApi<{ users: User[] }>('/auth/users'),
+  createUser: (input: CreateUserInput) =>
+    fetchApi<{ user: User }>('/auth/users', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  updateUser: (id: string, patch: UpdateUserInput) =>
+    fetchApi<{ user: User }>(`/auth/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+  resetPassword: (id: string, password: string) =>
+    fetchApi<{ success: boolean }>(`/auth/users/${id}/password`, {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    }),
+  deleteUser: (id: string) =>
+    fetchApi<{ success: boolean }>(`/auth/users/${id}`, { method: 'DELETE' }),
+
+  changeOwnPassword: (currentPassword: string, newPassword: string) =>
+    fetchApi<{ success: boolean }>('/auth/password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }),
+  updateProfile: (patch: { email: string | null }) =>
+    fetchApi<{ user: User }>('/auth/me', {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
 };
 
 // Types
@@ -127,15 +158,18 @@ export interface StartWorkflowInput {
 export interface WorkflowProgress {
   workflowId: string;
   status: 'running' | 'completed' | 'failed';
-  currentPhase: string | null;
-  currentAgent: string | null;
-  completedAgents: string[];
-  failedAgent: string | null;
+  // Live-progress fields — only present while a workflow is running.
+  // Completed / failed workflows return { workflowId, status, error, hasDeliverables } only,
+  // so every field below must be treated as optional at the callsite.
+  currentPhase?: string | null;
+  currentAgent?: string | null;
+  completedAgents?: string[];
+  failedAgent?: string | null;
   error: string | null;
-  startTime: number;
-  elapsedMs: number;
-  agentMetrics: Record<string, AgentMetrics>;
-  summary: PipelineSummary | null;
+  startTime?: number;
+  elapsedMs?: number;
+  agentMetrics?: Record<string, AgentMetrics>;
+  summary?: PipelineSummary | null;
   hasDeliverables?: boolean;
 }
 
@@ -216,4 +250,27 @@ export interface ApiKeysInput {
   anthropicApiKey?: string;
   openaiApiKey?: string;
   openrouterApiKey?: string;
+}
+
+export interface User {
+  id: string;
+  username: string;
+  email: string | null;
+  isAdmin: boolean;
+  disabled: boolean;
+  createdAt: string;
+  lastLoginAt: string | null;
+}
+
+export interface CreateUserInput {
+  username: string;
+  password: string;
+  email?: string;
+  isAdmin?: boolean;
+}
+
+export interface UpdateUserInput {
+  email?: string | null;
+  isAdmin?: boolean;
+  disabled?: boolean;
 }

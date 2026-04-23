@@ -3,22 +3,34 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Badge — a stamped metadata chip. Small, all-caps, wide-tracked mono.
+ * Variants map to run-state semantics (signal/go/alert/wait) rather
+ * than generic brand roles.
+ */
 const badgeVariants = cva(
-  "inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  [
+    "inline-flex items-center gap-1.5",
+    "px-2 py-[3px] border",
+    "font-mono text-[10px] font-medium uppercase",
+    "tracking-[0.18em] leading-none",
+    "transition-colors",
+  ].join(" "),
   {
     variants: {
       variant: {
         default:
-          "border-transparent bg-primary text-primary-foreground shadow hover:bg-primary/80",
+          "border-signal-400/60 text-signal-300 bg-signal-400/10",
         secondary:
-          "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
+          "border-ink-400 text-paper-400 bg-ink-200",
         destructive:
-          "border-transparent bg-destructive text-destructive-foreground shadow hover:bg-destructive/80",
-        outline: "text-foreground",
+          "border-alert-500/60 text-alert-400 bg-alert-500/10",
+        outline:
+          "border-ink-400 text-paper-0/80 bg-transparent",
         success:
-          "border-transparent bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100",
+          "border-go-500/50 text-go-400 bg-go-500/10",
         warning:
-          "border-transparent bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100",
+          "border-wait-500/50 text-wait-400 bg-wait-500/10",
       },
     },
     defaultVariants: {

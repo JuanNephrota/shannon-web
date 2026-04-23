@@ -1,6 +1,18 @@
 import { spawn, ChildProcess } from 'child_process';
+import { EventEmitter } from 'events';
 import path from 'path';
 import { settingsService } from './settings.js';
+
+/**
+ * Raw log events emitted by the worker process. Subscribers on the API
+ * tier (most notably the workflow-events SSE stream) hook into these to
+ * forward stdout/stderr to connected clients in real time.
+ */
+export interface WorkerLogEvent {
+  ts: number;
+  stream: 'stdout' | 'stderr' | 'system';
+  line: string;
+}
 
 // Shannon project root - must be configured via environment variable
 const SHANNON_ROOT = process.env.SHANNON_ROOT || path.resolve(process.cwd(), '..');
@@ -18,12 +30,35 @@ class WorkerService {
   private logs: string[] = [];
   private maxLogs = 100;
 
-  private addLog(message: string) {
+  /**
+   * Fan-out pub/sub for log lines. Subscribers (SSE connections, debug
+   * tools) can tap the same stdout/stderr stream without each one
+   * opening its own pipe. Keep the listener cap high — multiple users
+   * may be watching the same run simultaneously.
+   */
+  private emitter = new EventEmitter();
+
+  constructor() {
+    this.emitter.setMaxListeners(100);
+  }
+
+  /** Subscribe to log events. Returns an unsubscribe function. */
+  onLog(handler: (ev: WorkerLogEvent) => void): () => void {
+    this.emitter.on('log', handler);
+    return () => this.emitter.off('log', handler);
+  }
+
+  private emitLog(ev: WorkerLogEvent) {
+    this.emitter.emit('log', ev);
+  }
+
+  private addLog(message: string, stream: 'stdout' | 'stderr' | 'system' = 'system') {
     const timestamp = new Date().toISOString();
     this.logs.push(`[${timestamp}] ${message}`);
     if (this.logs.length > this.maxLogs) {
       this.logs.shift();
     }
+    this.emitLog({ ts: Date.now(), stream, line: message });
   }
 
   getStatus(): WorkerStatus {
@@ -84,12 +119,12 @@ class WorkerService {
 
       this.process.stdout?.on('data', (data: Buffer) => {
         const lines = data.toString().trim().split('\n');
-        lines.forEach(line => this.addLog(`[stdout] ${line}`));
+        lines.forEach((line) => this.addLog(`[stdout] ${line}`, 'stdout'));
       });
 
       this.process.stderr?.on('data', (data: Buffer) => {
         const lines = data.toString().trim().split('\n');
-        lines.forEach(line => this.addLog(`[stderr] ${line}`));
+        lines.forEach((line) => this.addLog(`[stderr] ${line}`, 'stderr'));
       });
 
       this.process.on('error', (error) => {

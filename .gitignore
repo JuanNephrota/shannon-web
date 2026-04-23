@@ -3,6 +3,9 @@ dist/
 .env
 .shannon-settings.json
 
+# Per-developer Claude Code settings (kept local; launch.json is shared)
+.claude/settings.local.json
+
 # TypeScript build info
 *.tsbuildinfo
 vite.config.js
