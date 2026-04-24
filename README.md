@@ -1,6 +1,6 @@
 # Shannon Web
 
-Web frontend for [Shannon](https://github.com/your-org/shannon) — AI‑powered penetration testing.
+Web frontend for [Shannon](https://github.com/KeygraphHQ/shannon) — AI‑powered penetration testing.
 
 A field‑terminal style operator console for driving Shannon pentests: kick
 off operations, watch agents work in real time, review deliverables, and
@@ -96,17 +96,20 @@ docker compose down -v
 ### Environment Variables for Docker
 
 ```bash
-# Required
-SHANNON_ROOT=/path/to/shannon          # Path to Shannon project
-ANTHROPIC_API_KEY=sk-ant-...           # Anthropic API key
-
-# Authentication (required for first run)
+# Required — first-run admin bootstrap
 ADMIN_USERNAME=admin                   # Initial admin username
-ADMIN_PASSWORD=your-secure-password    # Initial admin password (change this!)
-SESSION_SECRET=your-random-string      # Session signing secret (openssl rand -hex 32)
+ADMIN_PASSWORD=your-secure-password    # Change before first real run!
+SESSION_SECRET=your-random-string      # openssl rand -hex 32
 
-# Optional
-TARGET_REPO=/path/to/target            # Target repo (when using worker profile)
+# Required only if you want to actually run a pentest
+ANTHROPIC_API_KEY=sk-ant-...           # Needed by the worker; can also be
+                                       # set via the Settings page post-login
+
+# Optional — defaults to the bundled ./shannon
+SHANNON_ROOT=/path/to/other/shannon    # Point at a different Shannon checkout
+
+# Optional (worker profile)
+TARGET_REPO=/path/to/target            # Target repo for the worker to mount
 CLAUDE_CODE_MAX_OUTPUT_TOKENS=64000    # Increase for long reports
 ```
 
@@ -115,9 +118,12 @@ CLAUDE_CODE_MAX_OUTPUT_TOKENS=64000    # Increase for long reports
 ### Prerequisites
 
 - Node.js 22+
-- pnpm
-- Running [Temporal](https://temporal.io/) server (default: `localhost:7233`)
-- Shannon project built (`npm run build` in Shannon directory)
+- pnpm 10+
+- Running [Temporal](https://temporal.io/) server (default: `localhost:7233`) —
+  the easiest way is `docker compose up -d temporal`
+- If you want to run a real pentest locally (not just the UI), you'll also
+  need the bundled Shannon built:
+  `cd shannon && npm ci && npm run build`
 
 ### Setup
 
@@ -174,7 +180,7 @@ npm run install
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `SHANNON_ROOT` | Path to Shannon project root | `../` (sibling directory) |
+| `SHANNON_ROOT` | Path to Shannon project root | `./shannon` under Docker; `../` for local `pnpm dev` |
 | `TEMPORAL_ADDRESS` | Temporal server address | `localhost:7233` |
 | `AUDIT_LOGS_DIR` | Override audit logs directory | `$SHANNON_ROOT/audit-logs` |
 | `CONFIGS_DIR` | Override configs directory | `$SHANNON_ROOT/configs` |
@@ -288,18 +294,45 @@ stamped small‑caps labels, hairline borders, signal‑amber accents used
 sparingly to mark live run state. See `packages/web/src/index.css` and
 `packages/web/tailwind.config.js` for tokens.
 
-## Building Docker Image Manually
+## Bundled Shannon
+
+Shannon's source is vendored at [`./shannon/`](shannon/). It's a snapshot, not a
+git submodule — the commit this frontend was tested against only lives in PR
+refs upstream and isn't reliably clonable. Vendoring keeps the stack
+self-contained.
+
+**To update the bundled copy** to a newer Shannon version:
 
 ```bash
-# Build the image
+# From the shannon-web repo root, replace ./shannon with the source tree
+# from a fresh Shannon checkout (exclude node_modules, dist, runtime data):
+rsync -a --delete \
+  --exclude='.git/' --exclude='node_modules/' --exclude='dist/' \
+  --exclude='audit-logs/' --exclude='deliverables/' \
+  --exclude='repos/' --exclude='sessions/' --exclude='.env' \
+  /path/to/fresh/shannon/ ./shannon/
+git add shannon && git commit -m "Update bundled Shannon to <commit>"
+```
+
+Note: newer Shannon releases (>= v1.1.0) use a monorepo layout
+(`apps/worker/...`) that won't match shannon-web's compose wiring without
+additional changes. Verify the entrypoint path in `docker-compose.yml`
+matches the Shannon version you bundle.
+
+## Building the Docker Image Manually
+
+```bash
+# Build the web image
 docker build -t shannon-web .
 
-# Run with external Temporal
+# Run against an external Temporal, using the bundled Shannon for audit-logs
 docker run -d \
   -p 3001:3001 \
   -e TEMPORAL_ADDRESS=host.docker.internal:7233 \
   -e SHANNON_ROOT=/shannon \
-  -v /path/to/shannon:/shannon:ro \
+  -e ADMIN_USERNAME=admin -e ADMIN_PASSWORD=changeme \
+  -e SESSION_SECRET=$(openssl rand -hex 32) \
+  -v "$(pwd)/shannon":/shannon:ro \
   shannon-web
 ```
 
