@@ -42,8 +42,18 @@ COPY packages/shared/package.json ./packages/shared/
 COPY packages/api/package.json ./packages/api/
 COPY packages/web/package.json ./packages/web/
 
-# Install production dependencies only
-RUN pnpm install --frozen-lockfile --prod
+# Install production dependencies.
+#
+# `sqlite3` ships prebuilt binaries, but not for musl/arm64 (alpine on Apple
+# Silicon) — so we build from source. That needs python3 + a compiler AND
+# the `distutils` shim (removed in Python 3.12; `setuptools` provides it).
+# Package.json's `pnpm.onlyBuiltDependencies` allow-list lets the sqlite3
+# install script actually run under pnpm v10's post-install approval gate.
+RUN apk add --no-cache --virtual .build-deps \
+      python3 py3-setuptools make g++ \
+  && pnpm install --frozen-lockfile --prod \
+  && pnpm rebuild sqlite3 \
+  && apk del .build-deps
 
 # Copy built artifacts from builder
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist

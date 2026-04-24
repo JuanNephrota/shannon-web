@@ -36,7 +36,9 @@ Shannon Web provides:
 
 ## Quick Start with Docker
 
-The easiest way to run Shannon Web is with Docker Compose:
+Shannon's source is **bundled in this repo** at `shannon/` — pinned to the
+release this frontend was tested against. Clone, configure secrets, and
+bring up the stack:
 
 ```bash
 # 1. Clone and configure
@@ -44,17 +46,24 @@ git clone https://github.com/your-org/shannon-web.git
 cd shannon-web
 cp .env.example .env
 
-# 2. Edit .env to configure:
-#    - SHANNON_ROOT (path to Shannon project)
-#    - ANTHROPIC_API_KEY
+# 2. Edit .env to configure at minimum:
 #    - ADMIN_USERNAME and ADMIN_PASSWORD (initial admin credentials)
 #    - SESSION_SECRET (generate with: openssl rand -hex 32)
+#    - ANTHROPIC_API_KEY (required if you want to run actual pentests)
 
 # 3. Start the services
+#    Web UI + Temporal only (fast, lets you explore the app):
 docker compose up -d
+#    Full stack including the Shannon worker (needed to run pentests;
+#    heavier image with Chromium + security tools):
+docker compose --profile worker up -d
 
 # 4. Open http://localhost:3001
 ```
+
+The `web` and `worker` services both read Shannon from `./shannon`. If you
+want to point them at a different checkout, set `SHANNON_ROOT=/path/to/other`
+in your `.env`.
 
 ### Docker Compose Profiles
 
@@ -259,7 +268,8 @@ shannon-web/
 │   ├── shared/    # Shared TypeScript types (pipeline progress, events)
 │   ├── api/       # Express API server + SSE + Temporal client
 │   └── web/       # React + Vite frontend
-├── Dockerfile     # Multi-stage Docker build
+├── shannon/       # Vendored Shannon pentest engine (pinned release)
+├── Dockerfile     # Multi-stage Docker build for the web package
 ├── docker-compose.yml
 └── package.json   # Workspace root
 ```

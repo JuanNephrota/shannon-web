@@ -1,0 +1,5 @@
+node_modules/
+.env
+.shannon-settings.json
+audit-logs/
+dist/

@@ -1,15 +1,19 @@
 #
-# Docker Compose for Shannon Web Frontend
+# Docker Compose for Shannon Web Frontend — bundled edition.
+#
+# Shannon's source is vendored at ./shannon (pinned to the release this
+# frontend was tested against). Override with SHANNON_ROOT=/path/to/other
+# if you want to point at a different checkout.
 #
 # Usage:
-#   Start web frontend only (connects to external Temporal):
-#     docker compose up -d web
-#
-#   Start with built-in Temporal server:
+#   Web frontend + Temporal only (fast boot, no pentest execution):
 #     docker compose up -d
 #
-#   Start complete stack with Shannon worker:
+#   Full stack with Shannon worker (heavy — pulls Chromium + security tools):
 #     docker compose --profile worker up -d
+#
+#   Teardown + wipe data:
+#     docker compose down -v
 #
 
 services:
@@ -41,23 +45,33 @@ services:
       - PORT=3001
       - TEMPORAL_ADDRESS=temporal:7233
       - SHANNON_ROOT=/shannon
+      # Auth bootstrap — override via .env or shell env.
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme}
+      - SESSION_SECRET=${SESSION_SECRET:-change-me-to-a-random-hex-string}
+      # Optional LLM keys (can also be set in the web UI).
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
     depends_on:
       temporal:
         condition: service_healthy
     volumes:
-      # Mount Shannon directory for audit-logs and configs access
-      - ${SHANNON_ROOT:-../shannon}:/shannon:ro
-      # Persist settings
+      # Mount the vendored Shannon tree read-only for audit-logs and configs.
+      - ${SHANNON_ROOT:-./shannon}:/shannon:ro
+      # Persist settings + session DB
       - web-data:/app/data
     networks:
       - shannon-network
 
-  # Shannon Worker (optional - use profile 'worker' to enable)
-  # Requires SHANNON_ROOT to point to the Shannon repository
+  # Shannon Worker (optional — enable with `docker compose --profile worker up -d`)
+  #
+  # Heavy image: pulls Chromium, Go/Ruby/Python security tools. Only needed
+  # when actually running a pentest — the web UI alone works without it.
   worker:
     profiles: ["worker"]
     build:
-      context: ${SHANNON_ROOT:-../shannon}
+      context: ${SHANNON_ROOT:-./shannon}
       dockerfile: Dockerfile
     entrypoint: ["node", "dist/temporal/worker.js"]
     environment:
@@ -72,9 +86,9 @@ services:
       temporal:
         condition: service_healthy
     volumes:
-      - ${SHANNON_ROOT:-../shannon}/prompts:/app/prompts
-      - ${SHANNON_ROOT:-../shannon}/audit-logs:/app/audit-logs
-      - ${SHANNON_ROOT:-../shannon}/configs:/app/configs
+      - ${SHANNON_ROOT:-./shannon}/prompts:/app/prompts
+      - ${SHANNON_ROOT:-./shannon}/audit-logs:/app/audit-logs
+      - ${SHANNON_ROOT:-./shannon}/configs:/app/configs
       - ${TARGET_REPO:-.}:/target-repo
     shm_size: 2gb
     ipc: host
